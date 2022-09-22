@@ -8,7 +8,7 @@ import pandas as pd
 from os.path import exists
 
 debug = False
-file_name = 'testovaci_soubor.csv'
+file_name = 'output.csv'
 
 
 def print_info():
@@ -78,7 +78,6 @@ def load_nkcr_items() -> pandas.DataFrame:
         '0247a': 'S',
         '0247a-orcid': 'S'
     })
-    # data['100b'] = data['100b'].fillna('')
     data_csv.fillna('', inplace=True)
     return data_csv
 
