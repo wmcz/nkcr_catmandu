@@ -1,0 +1,38 @@
+# catmandu convert MARC --type XML --fix data/biografickapole-pro-frettieho.fix to CSV --fields "_id,100a,100b,100d,100q,046f,046g,370a,370b,370f,374a,375a,377a,400ia,500ia7,678a,0247a-isni,0247a-wikidata,0247a,0247a-orcid" < data/aut.xml > data/output.csv
+
+	do marc_each()
+	  marc_map(100a,100a)
+	  marc_map(100b,100b)
+	  marc_map(100d,100d)  
+	  marc_map(100q,100q)
+	  marc_map(046f,046f)
+	  marc_map(046g,046g)    
+	  marc_map(370a,370a)
+	  marc_map(370b,370b)
+	  marc_map(370f,370f.$append,join:"$")  
+	  marc_map(374a,374a.$append,join:"|")  
+	  marc_map(375a,375a.$append,join:"|")  
+	  marc_map(377a,377a.$append,join:"$")  
+	  marc_map(400ia,400ia.$append,join:"$")   
+	  marc_map(500ia7,500ia7.$append,join:"$") 
+	  marc_map(678a,678a.$append) 
+	  if marc_match(02472,"isni")
+		marc_map(0247a,0247a-isni)
+	  end
+	  if marc_match(02472,"wikidata")
+		marc_map(0247a,0247a-wikidata)
+	  end
+	  if marc_match(02472,"orcid")
+		marc_map(0247a,0247a-orcid)
+	  end
+	  
+	end
+
+join_field(370f,'|')
+join_field(374a,'|')
+join_field(375a,'|')
+join_field(377a,'|')
+join_field(400ia,'|')
+join_field(500ia7,'|')
+join_field(678a,'|')
+join_field(906a,'|')
