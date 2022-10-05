@@ -7,9 +7,12 @@ from pywikibot.data import sparql
 import pandas as pd
 from os.path import exists
 
-debug = False
+debug = True
 file_name = 'output.csv'
 
+if debug:
+    csvfile = open('debug.csv', 'w')
+    writer = csv.DictWriter(csvfile, fieldnames=['item', 'prop', 'value'])
 
 def print_info():
     print('Catmandu processor for NKČR')
@@ -24,6 +27,9 @@ def clean_last_comma(string: str) -> str:
         return string[:-1]
     return string
 
+def clean_qid(string: str) -> str:
+    string = string.replace(')', '').replace('(', '')
+    return string
 
 def get_all_non_deprecated_items() -> dict:
     non_deprecated_dictionary: dict[str, str] = {}
@@ -58,7 +64,7 @@ def get_all_non_deprecated_items() -> dict:
 
 
 def load_nkcr_items() -> pandas.DataFrame:
-    data_csv = pd.read_csv("testovaci_soubor.csv", dtype={
+    data_csv = pd.read_csv(file_name, dtype={
         '_id': 'S',
         '100a': 'S',
         '100b': 'S',
@@ -102,13 +108,16 @@ def add_nkcr_aut_to_item(item_to_add: pywikibot.ItemPage, nkcr_aut_to_add: str, 
 
     qualifier = pywikibot.Claim(repo, 'P1810')
     qualifier.setTarget(clean_last_comma(name_to_add))
-
-    item_to_add.addClaim(new_claim)
-    sources.append(source_nkcr)
-    sources.append(source_nkcr_aut)
-    sources.append(source_date)
-    new_claim.addSources(sources)
-    new_claim.addQualifier(qualifier)
+    if debug:
+        final = {'item': item_to_add.getID(), 'prop': 'P691', 'value': nkcr_aut_to_add}
+        writer.writerow(final)
+    else:
+        item_to_add.addClaim(new_claim)
+        sources.append(source_nkcr)
+        sources.append(source_nkcr_aut)
+        sources.append(source_date)
+        new_claim.addSources(sources)
+        new_claim.addQualifier(qualifier)
 
 
 def add_new_field_to_item(item_new_field: pywikibot.ItemPage, property_new_field: str, value: object, nkcr_aut_new_field: str):
@@ -126,12 +135,15 @@ def add_new_field_to_item(item_new_field: pywikibot.ItemPage, property_new_field
 
     new_claim = pywikibot.Claim(repo, property_new_field)
     new_claim.setTarget(value)
-
-    item_new_field.addClaim(new_claim)
-    sources.append(source_nkcr)
-    sources.append(source_nkcr_aut)
-    sources.append(source_date)
-    new_claim.addSources(sources)
+    if debug:
+        final = {'item': item_new_field.getID(), 'prop': property_new_field, 'value': value}
+        writer.writerow(final)
+    else:
+        item_new_field.addClaim(new_claim)
+        sources.append(source_nkcr)
+        sources.append(source_nkcr_aut)
+        sources.append(source_date)
+        new_claim.addSources(sources)
 
 
 def prepare_isni_from_nkcr(isni:str) -> str:
@@ -156,25 +168,25 @@ def process_new_fields(qid_new_fields: str, row_new_fields: object):
             for claim_in_new_item in claims_in_new_item:
                 if row_new_fields[column] != claim_in_new_item.getTarget() and row_new_fields[column] != '':
                     # insert
-                    if not debug:
-                        add_new_field_to_item(item_new_field, property_for_new_field, row_new_fields[column], row_new_fields['_id'])
+                    add_new_field_to_item(item_new_field, property_for_new_field, row_new_fields[column], row_new_fields['_id'])
 
         except ValueError as e:
+            print(e)
             pass
-            # print(e)
         except pywikibot.exceptions.OtherPageSaveError as e:
+            print(e)
             pass
-            # print(e)
         except KeyError as e:
             # insert
             try:
                 if column == '0247a-isni':
                     row_new_fields[column] = prepare_isni_from_nkcr(row_new_fields[column])
-                if not debug:
-                    add_new_field_to_item(item_new_field, property_for_new_field, row_new_fields[column], row_new_fields['_id'])
+                add_new_field_to_item(item_new_field, property_for_new_field, row_new_fields[column], row_new_fields['_id'])
             except KeyError as e:
+                print(e)
                 pass
             except pywikibot.exceptions.OtherPageSaveError as e:
+                print(e)
                 pass
 
 
@@ -194,19 +206,20 @@ if __name__ == '__main__':
     non_deprecated_items = get_all_non_deprecated_items()
     data = load_nkcr_items()
 
+
     for index, row in data.iterrows():
         nkcr_aut = row['_id']
         qid = row['0247a-wikidata']
         if qid != '':  # raději bych none, ale to tady nejde ... pandas, no
             name = row['100a']
+            qid = clean_qid(qid)
             item = pywikibot.ItemPage(repo, qid)
-            datas = item.get()
+            datas = item.get(get_redirect=True)
             try:
                 nkcr_auts = get_nkcr_auts_from_item(datas)
                 if nkcr_aut not in nkcr_auts:
                     try:
-                        if not debug:
-                            add_nkcr_aut_to_item(item, nkcr_aut, name)
+                        add_nkcr_aut_to_item(item, nkcr_aut, name)
                     except pywikibot.exceptions.OtherPageSaveError as e:
                         print(e)
                     except ValueError as e:
@@ -217,3 +230,5 @@ if __name__ == '__main__':
             exist_qid = non_deprecated_items[nkcr_aut]
             if qid != exist_qid:
                 process_new_fields(exist_qid, row)
+
+    csvfile.close()
