@@ -13,6 +13,8 @@ file_name = 'output.csv'
 
 def print_info():
     print('Catmandu processor for NKČR')
+
+    print('TEST deploy')
     if debug:
         print('DEBUG!!!')
 
