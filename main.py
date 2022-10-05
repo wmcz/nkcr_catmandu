@@ -156,7 +156,7 @@ def prepare_isni_from_nkcr(isni:str) -> str:
 def process_new_fields(qid_new_fields: str, row_new_fields: object):
     # print('process')
     item_new_field = pywikibot.ItemPage(repo, qid_new_fields)
-    datas_new_field = item_new_field.get()
+    datas_new_field = item_new_field.get(get_redirect=True)
     # isni = P213
     # orcid = P496
     properties = {'0247a-isni': 'P213', '0247a-orcid': 'P496'}
@@ -181,7 +181,8 @@ def process_new_fields(qid_new_fields: str, row_new_fields: object):
             try:
                 if column == '0247a-isni':
                     row_new_fields[column] = prepare_isni_from_nkcr(row_new_fields[column])
-                add_new_field_to_item(item_new_field, property_for_new_field, row_new_fields[column], row_new_fields['_id'])
+                if row_new_fields[column] != '':
+                    add_new_field_to_item(item_new_field, property_for_new_field, row_new_fields[column], row_new_fields['_id'])
             except KeyError as e:
                 print(e)
                 pass
@@ -229,7 +230,7 @@ if __name__ == '__main__':
                 print('key err')
         if nkcr_aut in non_deprecated_items.keys():
             exist_qid = non_deprecated_items[nkcr_aut]
-            if qid != exist_qid:
+            if qid != exist_qid and qid != '':
                 process_new_fields(exist_qid, row)
 
     csvfile.close()
