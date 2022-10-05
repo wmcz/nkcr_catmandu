@@ -209,6 +209,7 @@ if __name__ == '__main__':
 
     for index, row in data.iterrows():
         nkcr_aut = row['_id']
+        print(nkcr_aut)
         qid = row['0247a-wikidata']
         if qid != '':  # raději bych none, ale to tady nejde ... pandas, no
             name = row['100a']
