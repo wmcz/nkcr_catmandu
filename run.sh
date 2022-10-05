@@ -8,4 +8,6 @@ catmandu convert MARC --type XML --fix biografickapole-pro-frettieho.fix to CSV 
 echo "Converted to CSV"
 cp output.csv /var/www/autority.wikimedia.cz/output.csv
 echo "Copied output.csv to autorita.wikimedia.cz"
+rm cache.csv
+python3 main.py
 
