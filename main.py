@@ -111,6 +111,7 @@ def add_nkcr_aut_to_item(item_to_add: pywikibot.ItemPage, nkcr_aut_to_add: str, 
     if debug:
         final = {'item': item_to_add.getID(), 'prop': 'P691', 'value': nkcr_aut_to_add}
         writer.writerow(final)
+        print(final)
     else:
         item_to_add.addClaim(new_claim)
         sources.append(source_nkcr)
@@ -138,6 +139,7 @@ def add_new_field_to_item(item_new_field: pywikibot.ItemPage, property_new_field
     if debug:
         final = {'item': item_new_field.getID(), 'prop': property_new_field, 'value': value}
         writer.writerow(final)
+        print(final)
     else:
         item_new_field.addClaim(new_claim)
         sources.append(source_nkcr)
@@ -210,7 +212,7 @@ if __name__ == '__main__':
 
     for index, row in data.iterrows():
         nkcr_aut = row['_id']
-        print(nkcr_aut)
+        # print(nkcr_aut)
         qid = row['0247a-wikidata']
         if qid != '':  # raději bych none, ale to tady nejde ... pandas, no
             name = row['100a']
@@ -230,7 +232,7 @@ if __name__ == '__main__':
                 print('key err')
         if nkcr_aut in non_deprecated_items.keys():
             exist_qid = non_deprecated_items[nkcr_aut]
-            if qid != exist_qid and qid != '':
+            if qid != '':
                 process_new_fields(exist_qid, row)
 
     csvfile.close()
