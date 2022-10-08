@@ -7,6 +7,10 @@ from pywikibot.data import sparql
 import pandas as pd
 from os.path import exists
 
+class BadItemException(Exception):
+    pass
+
+
 debug = True
 file_name = 'output.csv'
 
@@ -29,6 +33,10 @@ def clean_last_comma(string: str) -> str:
 
 def clean_qid(string: str) -> str:
     string = string.replace(')', '').replace('(', '')
+    first_letter = string[0]
+    if first_letter.upper() != 'Q':
+        raise BadItemException(string)
+
     return string
 
 def get_all_non_deprecated_items() -> dict:
@@ -213,26 +221,30 @@ if __name__ == '__main__':
     for index, row in data.iterrows():
         nkcr_aut = row['_id']
         # print(nkcr_aut)
-        qid = row['0247a-wikidata']
-        if qid != '':  # raději bych none, ale to tady nejde ... pandas, no
-            name = row['100a']
-            qid = clean_qid(qid)
-            item = pywikibot.ItemPage(repo, qid)
-            datas = item.get(get_redirect=True)
-            try:
-                nkcr_auts = get_nkcr_auts_from_item(datas)
-                if nkcr_aut not in nkcr_auts:
-                    try:
-                        add_nkcr_aut_to_item(item, nkcr_aut, name)
-                    except pywikibot.exceptions.OtherPageSaveError as e:
-                        print(e)
-                    except ValueError as e:
-                        print(e)
-            except KeyError as e:
-                print('key err')
-        if nkcr_aut in non_deprecated_items.keys():
-            exist_qid = non_deprecated_items[nkcr_aut]
-            if qid != '':
-                process_new_fields(exist_qid, row)
+        try:
+            qid = row['0247a-wikidata']
+            if qid != '':  # raději bych none, ale to tady nejde ... pandas, no
+                name = row['100a']
+                qid = clean_qid(qid)
+                item = pywikibot.ItemPage(repo, qid)
+                datas = item.get(get_redirect=True)
+                try:
+                    nkcr_auts = get_nkcr_auts_from_item(datas)
+                    if nkcr_aut not in nkcr_auts:
+                        try:
+                            add_nkcr_aut_to_item(item, nkcr_aut, name)
+                        except pywikibot.exceptions.OtherPageSaveError as e:
+                            print(e)
+                        except ValueError as e:
+                            print(e)
+                except KeyError as e:
+                    print('key err')
+            if nkcr_aut in non_deprecated_items.keys():
+                exist_qid = non_deprecated_items[nkcr_aut]
+                if qid != '':
+                    process_new_fields(exist_qid, row)
+        except BadItemException as e:
+            print(e)
+
 
     csvfile.close()
