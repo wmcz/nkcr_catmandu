@@ -183,7 +183,7 @@ def process_new_fields(qid_new_fields: str, row_new_fields: object):
     properties = {'0247a-isni': 'P213', '0247a-orcid': 'P496'}
     for column, property_for_new_field in properties.items():
         try:
-            claims_in_new_item = datas_new_field['claims'][property_for_new_field]
+            claims_in_new_item = datas_new_field['claims'].get(property_for_new_field, [])
             if column == '0247a-isni':
                 row_new_fields[column] = prepare_isni_from_nkcr(row_new_fields[column])
             for claim_in_new_item in claims_in_new_item:
@@ -214,7 +214,7 @@ def process_new_fields(qid_new_fields: str, row_new_fields: object):
 
 def get_nkcr_auts_from_item(datas) -> list:
     nkcr_auts = []
-    claims = datas['claims']['P691']
+    claims = datas['claims'].get('P691', [])
     for claim in claims:
         nkcr_auts.append(claim.getTarget())
 
