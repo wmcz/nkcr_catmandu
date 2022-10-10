@@ -1,22 +1,34 @@
+import argparse
 import csv
 from typing import Union
 from datetime import datetime
 import pandas
 import pywikibot.data.sparql
+import requests
 from pywikibot.data import sparql
 import pandas as pd
 from os.path import exists
+import pathlib
 
 class BadItemException(Exception):
     pass
 
-
 debug = True
-file_name = 'output.csv'
+# file_name = 'output.csv'
 
-if debug:
-    csvfile = open('debug.csv', 'w')
+parser = argparse.ArgumentParser(description='NKČR catmandu pipeline.')
+parser.add_argument('-i','--input', help='NKČR CSV file name',required=True)
+args = parser.parse_args()
+print ("Input file: %s" % args.input )
+file_name = args.input
+def write_log(fields, create_file=False):
+    if create_file:
+        csvfile = open('debug.csv', 'w')
+    else:
+        csvfile = open('debug.csv', 'a')
     writer = csv.DictWriter(csvfile, fieldnames=['item', 'prop', 'value'])
+    writer.writerow(fields)
+    csvfile.close()
 
 def print_info():
     print('Catmandu processor for NKČR')
@@ -118,8 +130,8 @@ def add_nkcr_aut_to_item(item_to_add: pywikibot.ItemPage, nkcr_aut_to_add: str, 
     qualifier.setTarget(clean_last_comma(name_to_add))
     if debug:
         final = {'item': item_to_add.getID(), 'prop': 'P691', 'value': nkcr_aut_to_add}
-        writer.writerow(final)
-        print(final)
+        write_log(final)
+        # print(final)
     else:
         item_to_add.addClaim(new_claim)
         sources.append(source_nkcr)
@@ -146,8 +158,7 @@ def add_new_field_to_item(item_new_field: pywikibot.ItemPage, property_new_field
     new_claim.setTarget(value)
     if debug:
         final = {'item': item_new_field.getID(), 'prop': property_new_field, 'value': value}
-        writer.writerow(final)
-        print(final)
+        write_log(final)
     else:
         item_new_field.addClaim(new_claim)
         sources.append(source_nkcr)
@@ -216,8 +227,8 @@ if __name__ == '__main__':
 
     non_deprecated_items = get_all_non_deprecated_items()
     data = load_nkcr_items()
-
-
+    head = {'item': 'item', 'prop': 'property', 'value': 'value'}
+    write_log(head, True)
     for index, row in data.iterrows():
         nkcr_aut = row['_id']
         # print(nkcr_aut)
@@ -245,6 +256,5 @@ if __name__ == '__main__':
                     process_new_fields(exist_qid, row)
         except BadItemException as e:
             print(e)
-
-
-    csvfile.close()
+        except requests.exceptions.ConnectionError as e:
+            print(e)
