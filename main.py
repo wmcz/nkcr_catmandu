@@ -258,7 +258,7 @@ if __name__ == '__main__':
                     print('key err')
             if nkcr_aut in non_deprecated_items.keys():
                 exist_qid = non_deprecated_items[nkcr_aut]
-                if qid != '':
+                if exist_qid != '':
                     process_new_fields(exist_qid, row)
         except BadItemException as e:
             print(e)
