@@ -186,10 +186,14 @@ def process_new_fields(qid_new_fields: str, row_new_fields: object):
             claims_in_new_item = datas_new_field['claims'].get(property_for_new_field, [])
             if column == '0247a-isni':
                 row_new_fields[column] = prepare_isni_from_nkcr(row_new_fields[column])
-            for claim_in_new_item in claims_in_new_item:
-                if row_new_fields[column] != claim_in_new_item.getTarget() and row_new_fields[column] != '':
-                    # insert
+            if (len(claims_in_new_item) == 0):
+                if row_new_fields[column] != '':
                     add_new_field_to_item(item_new_field, property_for_new_field, row_new_fields[column], row_new_fields['_id'])
+            else:
+                for claim_in_new_item in claims_in_new_item:
+                    if row_new_fields[column] != claim_in_new_item.getTarget() and row_new_fields[column] != '':
+                        # insert
+                        add_new_field_to_item(item_new_field, property_for_new_field, row_new_fields[column], row_new_fields['_id'])
 
         except ValueError as e:
             print(e)
@@ -198,18 +202,19 @@ def process_new_fields(qid_new_fields: str, row_new_fields: object):
             print(e)
             pass
         except KeyError as e:
-            # insert
-            try:
-                if column == '0247a-isni':
-                    row_new_fields[column] = prepare_isni_from_nkcr(row_new_fields[column])
-                if row_new_fields[column] != '':
-                    add_new_field_to_item(item_new_field, property_for_new_field, row_new_fields[column], row_new_fields['_id'])
-            except KeyError as e:
-                print(e)
-                pass
-            except pywikibot.exceptions.OtherPageSaveError as e:
-                print(e)
-                pass
+            print(e)
+            pass
+            # try:
+            #     if column == '0247a-isni':
+            #         row_new_fields[column] = prepare_isni_from_nkcr(row_new_fields[column])
+            #     if row_new_fields[column] != '':
+            #         add_new_field_to_item(item_new_field, property_for_new_field, row_new_fields[column], row_new_fields['_id'])
+            # except KeyError as e:
+            #     print(e)
+            #     pass
+            # except pywikibot.exceptions.OtherPageSaveError as e:
+            #     print(e)
+            #     pass
 
 
 def get_nkcr_auts_from_item(datas) -> list:
@@ -244,6 +249,7 @@ if __name__ == '__main__':
                     if nkcr_aut not in nkcr_auts:
                         try:
                             add_nkcr_aut_to_item(item, nkcr_aut, name)
+                            non_deprecated_items[nkcr_aut] = qid
                         except pywikibot.exceptions.OtherPageSaveError as e:
                             print(e)
                         except ValueError as e:
