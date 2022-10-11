@@ -1,6 +1,8 @@
 #!/bin/bash
 echo "Move to directory"
 cd /home/frettie/nkcr_catmandu_pipeline;
+rm aut.xml.gz
+rm aut.xml
 echo "Run Catmandu"
 wget https://aleph.nkp.cz/data/aut.xml.gz
 echo "Downloaded AUT XML GZ"
