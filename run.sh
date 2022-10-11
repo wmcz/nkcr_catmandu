@@ -1,4 +1,6 @@
 #!/bin/bash
+echo "Move to directory"
+cd /home/frettie/nkcr_catmandu_pipeline;
 echo "Run Catmandu"
 wget https://aleph.nkp.cz/data/aut.xml.gz
 echo "Downloaded AUT XML GZ"
@@ -9,5 +11,5 @@ echo "Converted to CSV"
 cp output.csv /var/www/autority.wikimedia.cz/output.csv
 echo "Copied output.csv to autorita.wikimedia.cz"
 rm cache.csv
-python3 main.py
+#.  /home/frettie/nkcr_catmandu_pipeline/bin/activate && python3 /home/frettie/nkcr_catmandu_pipeline/main.py --input /home/frettie/nkcr_catmandu_pipeline/output.csv ; deactivate
 
