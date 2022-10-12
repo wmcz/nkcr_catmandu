@@ -10,9 +10,23 @@ from pywikibot.data import sparql
 import pandas as pd
 from os.path import exists
 import pathlib
+import time
+
+from pywikibot.data.api import Request
+from pywikibot.page._collections import (
+    AliasesDict,
+    ClaimCollection,
+    LanguageDict,
+    SiteLinkCollection,
+)
 
 class BadItemException(Exception):
     pass
+
+class MyItemPage(pywikibot.ItemPage):
+    DATA_ATTRIBUTES = {
+        'claims': ClaimCollection,
+    }
 
 debug = True
 # file_name = 'output.csv'
@@ -182,10 +196,14 @@ def prepare_isni_from_nkcr(isni:str) -> str:
         return ' '.join(chunks)
 
 
-def process_new_fields(qid_new_fields: str, row_new_fields: object):
+def process_new_fields(qid_new_fields: Union[str, None], row_new_fields: object, item: Union[pywikibot.ItemPage, None] = None):
     # print('process')
-    item_new_field = pywikibot.ItemPage(repo, qid_new_fields)
-    datas_new_field = item_new_field.get(get_redirect=True)
+    if item is None:
+        item_new_field = MyItemPage(repo, qid_new_fields)
+        datas_new_field = item_new_field.get(get_redirect=True)
+    else:
+        item_new_field = item
+        datas_new_field = item.get(get_redirect=True)
     # isni = P213
     # orcid = P496
     properties = {'0247a-isni': 'P213', '0247a-orcid': 'P496'}
@@ -235,8 +253,11 @@ def get_nkcr_auts_from_item(datas) -> list:
 
 if __name__ == '__main__':
     print_info()
-    site = pywikibot.Site('wikidata', 'wikidata')
-    repo = site.data_repository()
+    repo = pywikibot.DataSite('wikidata', 'wikidata')
+
+    qid = "Q1063371"
+    item = MyItemPage(repo, qid)
+    datas = item.get(get_redirect=True)
 
     non_deprecated_items = get_all_non_deprecated_items()
     data = load_nkcr_items()
@@ -244,13 +265,14 @@ if __name__ == '__main__':
     write_log(head, True)
     for index, row in data.iterrows():
         nkcr_aut = row['_id']
-        # print(nkcr_aut)
+        print(nkcr_aut)
         try:
             qid = row['0247a-wikidata']
             if qid != '':  # raději bych none, ale to tady nejde ... pandas, no
                 name = row['100a']
+
                 qid = clean_qid(qid)
-                item = pywikibot.ItemPage(repo, qid)
+                item = MyItemPage(repo, qid)
                 datas = item.get(get_redirect=True)
                 try:
                     nkcr_auts = get_nkcr_auts_from_item(datas)
@@ -264,12 +286,25 @@ if __name__ == '__main__':
                             print(e)
                 except KeyError as e:
                     print('key err')
-            if nkcr_aut in non_deprecated_items.keys():
+            ms = time.time()
+            # print(ms)
+            if nkcr_aut in non_deprecated_items:
+
+
+                ms = time.time()
+                # print(ms)
                 exist_qid = non_deprecated_items[nkcr_aut]
+                ms = time.time()
+                # print(ms)
                 if exist_qid != '':
+                    ms = time.time()
+                    # print(ms)
                     process_new_fields(exist_qid, row)
+                    ms = time.time()
+                    # print(ms)
                 if qid != '' and exist_qid != qid:
-                    process_new_fields(qid, row)
+                    ms = time.time()
+                    process_new_fields(None, row, item)
         except BadItemException as e:
             print(e)
         except requests.exceptions.ConnectionError as e:

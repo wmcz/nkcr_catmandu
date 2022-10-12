@@ -174,15 +174,15 @@ upload_to_commons = False
 # 'maxlag' is used to control the rate of server access (see below).
 # Set minthrottle to non-zero to use a throttle on read access.
 minthrottle = 0
-maxthrottle = 3
+maxthrottle = 1
 
 # Slow down the robot such that it never makes a second page edit within
 # 'put_throttle' seconds.
-put_throttle = 1
+put_throttle = 0
 
 # Sometimes you want to know when a delay is inserted. If a delay is larger
 # than 'noisysleep' seconds, it is logged on the screen.
-noisysleep = 1.0
+noisysleep = 0
 
 # Defer bot edits during periods of database server lag. For details, see
 # https://www.mediawiki.org/wiki/Maxlag_parameter
