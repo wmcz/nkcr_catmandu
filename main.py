@@ -260,6 +260,8 @@ if __name__ == '__main__':
                 exist_qid = non_deprecated_items[nkcr_aut]
                 if exist_qid != '':
                     process_new_fields(exist_qid, row)
+                if qid != '':
+                    process_new_fields(qid, row)
         except BadItemException as e:
             print(e)
         except requests.exceptions.ConnectionError as e:
