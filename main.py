@@ -1,5 +1,6 @@
 import argparse
 import csv
+import re
 from typing import Union
 from datetime import datetime
 import pandas
@@ -169,9 +170,16 @@ def add_new_field_to_item(item_new_field: pywikibot.ItemPage, property_new_field
 
 def prepare_isni_from_nkcr(isni:str) -> str:
     # https://pythonexamples.org/python-split-string-into-specific-length-chunks/
-    n = 4
-    chunks = [isni[i:i + n] for i in range(0, len(isni), n)]
-    return ' '.join(chunks)
+    isni = isni.replace(' ', '')
+    regex = u"^(\d{16})$"
+
+    match = re.search(regex, isni, re.IGNORECASE)
+    if not match:
+        return ''
+    else:
+        n = 4
+        chunks = [isni[i:i + n] for i in range(0, len(isni), n)]
+        return ' '.join(chunks)
 
 
 def process_new_fields(qid_new_fields: str, row_new_fields: object):
@@ -260,7 +268,7 @@ if __name__ == '__main__':
                 exist_qid = non_deprecated_items[nkcr_aut]
                 if exist_qid != '':
                     process_new_fields(exist_qid, row)
-                if qid != '':
+                if qid != '' and exist_qid != qid:
                     process_new_fields(qid, row)
         except BadItemException as e:
             print(e)
