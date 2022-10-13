@@ -259,7 +259,7 @@ if __name__ == '__main__':
     data = load_nkcr_items()
     head = {'item': 'item', 'prop': 'property', 'value': 'value'}
     write_log(head, True)
-    for index, row in data.iterrows():
+    for row in data.to_dict('records'):
         nkcr_aut = row['_id']
         print(nkcr_aut)
         try:
