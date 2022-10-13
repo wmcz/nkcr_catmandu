@@ -9,33 +9,32 @@ import requests
 from pywikibot.data import sparql
 import pandas as pd
 from os.path import exists
-import pathlib
 import time
 
-from pywikibot.data.api import Request
 from pywikibot.page._collections import (
-    AliasesDict,
     ClaimCollection,
-    LanguageDict,
-    SiteLinkCollection,
 )
+
 
 class BadItemException(Exception):
     pass
+
 
 class MyItemPage(pywikibot.ItemPage):
     DATA_ATTRIBUTES = {
         'claims': ClaimCollection,
     }
 
+
 debug = True
-# file_name = 'output.csv'
 
 parser = argparse.ArgumentParser(description='NKČR catmandu pipeline.')
-parser.add_argument('-i','--input', help='NKČR CSV file name',required=True)
+parser.add_argument('-i', '--input', help='NKČR CSV file name', required=True)
 args = parser.parse_args()
-print ("Input file: %s" % args.input )
+print("Input file: %s" % args.input)
 file_name = args.input
+
+
 def write_log(fields, create_file=False):
     if create_file:
         csvfile = open('debug.csv', 'w')
@@ -44,6 +43,7 @@ def write_log(fields, create_file=False):
     writer = csv.DictWriter(csvfile, fieldnames=['item', 'prop', 'value'])
     writer.writerow(fields)
     csvfile.close()
+
 
 def print_info():
     print('Catmandu processor for NKČR')
@@ -58,6 +58,7 @@ def clean_last_comma(string: str) -> str:
         return string[:-1]
     return string
 
+
 def clean_qid(string: str) -> str:
     string = string.replace(')', '').replace('(', '')
     first_letter = string[0]
@@ -66,8 +67,9 @@ def clean_qid(string: str) -> str:
 
     return string
 
-def get_all_non_deprecated_items() -> dict:
-    non_deprecated_dictionary: dict[str, str] = {}
+
+def get_all_non_deprecated_items() -> dict[dict[str, list, list]]:
+    non_deprecated_dictionary: dict[dict[str, list, list]] = {}
     if exists('cache.csv'):
         with open('cache.csv') as csvfile:
             lines = csv.DictReader(csvfile)
@@ -75,25 +77,58 @@ def get_all_non_deprecated_items() -> dict:
                 non_deprecated_dictionary[line['nkcr']] = line['qid']
         return non_deprecated_dictionary
     query = """
-    select ?item ?nkcr where {
+    select ?item ?nkcr ?isni ?orcid where {
         ?item p:P691 [ps:P691 ?nkcr ; wikibase:rank ?rank ] filter(?rank != wikibase:DeprecatedRank) .
+        OPTIONAL{?item wdt:P213 ?isni}.
+        OPTIONAL{?item wdt:P496 ?orcid}.
     }
-    
     """
     query_object = sparql.SparqlQuery()
     data_non_deprecated = query_object.select(query=query, full_data=True)
 
     non_deprecated_dictionary_cache = []
-    item_non_deprecated: dict[str, Union[pywikibot.data.sparql.URI, pywikibot.data.sparql.Literal]]
+    item_non_deprecated: dict[str, Union[pywikibot.data.sparql.URI, pywikibot.data.sparql.Literal, Union[pywikibot.data.sparql.Literal,None], Union[pywikibot.data.sparql.Literal, None]]]
     for item_non_deprecated in data_non_deprecated:
-        non_deprecated_dictionary[item_non_deprecated['nkcr'].value] = item_non_deprecated['item'].getID()
-        non_deprecated_dictionary_cache.append(
-            {'nkcr': item_non_deprecated['nkcr'], 'qid': item_non_deprecated['item'].getID()})
+        if item_non_deprecated['isni'] is not None:
+            isni = item_non_deprecated['isni'].value
+        else:
+            isni = None
 
-    with open('cache.csv', 'w') as csvfile:
-        writer = csv.DictWriter(csvfile, fieldnames=['nkcr', 'qid'])
-        writer.writeheader()
-        writer.writerows(non_deprecated_dictionary_cache)
+        if item_non_deprecated['orcid'] is not None:
+            orcid = item_non_deprecated['orcid'].value
+        else:
+            orcid = None
+
+        if non_deprecated_dictionary.get(item_non_deprecated['nkcr'].value, None):
+            if isni is not None:
+                non_deprecated_dictionary[item_non_deprecated['nkcr'].value]['isni'].append(isni)
+
+            if orcid is not None:
+                non_deprecated_dictionary[item_non_deprecated['nkcr'].value]['orcid'].append(orcid)
+        else:
+            if isni is not None:
+                isni_add = [isni]
+            else:
+                isni_add = []
+
+            if orcid is not None:
+                orcid_add = [orcid]
+            else:
+                orcid_add = []
+
+            non_deprecated_dictionary[item_non_deprecated['nkcr'].value] = {
+                'qid': item_non_deprecated['item'].getID(),
+                'isni': isni_add,
+                'orcid': orcid_add,
+            }
+
+        # non_deprecated_dictionary_cache.append(
+        #     {'nkcr': item_non_deprecated['nkcr'].value, 'qid': item_non_deprecated['item'].getID()})
+
+    # with open('cache.csv', 'w') as csvfile:
+    #     writer = csv.DictWriter(csvfile, fieldnames=['nkcr', 'qid'])
+    #     writer.writeheader()
+    #     writer.writerows(non_deprecated_dictionary_cache)
 
     return non_deprecated_dictionary
 
@@ -156,7 +191,8 @@ def add_nkcr_aut_to_item(item_to_add: pywikibot.ItemPage, nkcr_aut_to_add: str, 
         new_claim.addQualifier(qualifier)
 
 
-def add_new_field_to_item(item_new_field: pywikibot.ItemPage, property_new_field: str, value: object, nkcr_aut_new_field: str):
+def add_new_field_to_item(item_new_field: pywikibot.ItemPage, property_new_field: str, value: object,
+                          nkcr_aut_new_field: str):
     sources = []
 
     source_nkcr = pywikibot.Claim(repo, 'P248')
@@ -182,7 +218,7 @@ def add_new_field_to_item(item_new_field: pywikibot.ItemPage, property_new_field
         new_claim.addSources(sources)
 
 
-def prepare_isni_from_nkcr(isni:str) -> str:
+def prepare_isni_from_nkcr(isni: str) -> str:
     # https://pythonexamples.org/python-split-string-into-specific-length-chunks/
     isni = isni.replace(' ', '')
     regex = u"^(\d{16})$"
@@ -192,43 +228,53 @@ def prepare_isni_from_nkcr(isni:str) -> str:
         return ''
     else:
         n = 4
-        chunks = [isni[i:i + n] for i in range(0, len(isni), n)]
-        return ' '.join(chunks)
+        str_chunks = [isni[i:i + n] for i in range(0, len(isni), n)]
+        return ' '.join(str_chunks)
 
 
-def process_new_fields(qid_new_fields: Union[str, None], row_new_fields: object, item: Union[pywikibot.ItemPage, None] = None):
+def process_new_fields(qid_new_fields: Union[str, None], wd_data: dict, row_new_fields: object,
+                       wd_item: Union[pywikibot.ItemPage, None] = None):
     # print('process')
     if item is None:
         item_new_field = MyItemPage(repo, qid_new_fields)
-        datas_new_field = item_new_field.get(get_redirect=True)
+        # datas_new_field = item_new_field.get(get_redirect=True)
     else:
-        item_new_field = item
-        datas_new_field = item.get(get_redirect=True)
+        item_new_field = wd_item
+        # datas_new_field = item.get(get_redirect=True)
     # isni = P213
     # orcid = P496
+    # properties = {'0247a-isni': 'P213', '0247a-orcid': 'P496'}
     properties = {'0247a-isni': 'P213', '0247a-orcid': 'P496'}
     for column, property_for_new_field in properties.items():
         try:
-            claims_in_new_item = datas_new_field['claims'].get(property_for_new_field, [])
+            # claims_in_new_item = datas_new_field['claims'].get(property_for_new_field, [])
+            claims = []
+            if column == '0247a-isni':
+                claims = wd_data['isni']
+            if column == '0247a-orcid':
+                claims = wd_data['orcid']
+
             if column == '0247a-isni':
                 row_new_fields[column] = prepare_isni_from_nkcr(row_new_fields[column])
-            if (len(claims_in_new_item) == 0):
+            if len(claims) == 0:
                 if row_new_fields[column] != '':
-                    add_new_field_to_item(item_new_field, property_for_new_field, row_new_fields[column], row_new_fields['_id'])
+                    add_new_field_to_item(item_new_field, property_for_new_field, row_new_fields[column],
+                                          row_new_fields['_id'])
             else:
-                for claim_in_new_item in claims_in_new_item:
-                    if row_new_fields[column] != claim_in_new_item.getTarget() and row_new_fields[column] != '':
+                for claim_in_new_item in claims:
+                    if row_new_fields[column] != claim_in_new_item and row_new_fields[column] != '':
                         # insert
-                        add_new_field_to_item(item_new_field, property_for_new_field, row_new_fields[column], row_new_fields['_id'])
+                        add_new_field_to_item(item_new_field, property_for_new_field, row_new_fields[column],
+                                              row_new_fields['_id'])
 
-        except ValueError as e:
-            print(e)
+        except ValueError as ve:
+            print(ve)
             pass
-        except pywikibot.exceptions.OtherPageSaveError as e:
-            print(e)
+        except pywikibot.exceptions.OtherPageSaveError as opse:
+            print(opse)
             pass
-        except KeyError as e:
-            print(e)
+        except KeyError as ke:
+            print(ke)
             pass
             # try:
             #     if column == '0247a-isni':
@@ -244,19 +290,35 @@ def process_new_fields(qid_new_fields: Union[str, None], row_new_fields: object,
 
 
 def get_nkcr_auts_from_item(datas) -> list:
-    nkcr_auts = []
+    nkcr_auts_from_data = []
     claims = datas['claims'].get('P691', [])
     for claim in claims:
         nkcr_auts.append(claim.getTarget())
 
-    return nkcr_auts
+    return nkcr_auts_from_data
+
+
+def make_qid_database(items: dict) -> dict[str, list[str]]:
+    return_qids: dict[str, list[str]] = {}
+    for nkcr, nkcr_line in items.items():
+        if return_qids.get(nkcr_line['qid']):
+            return_qids[nkcr_line['qid']].append(nkcr)
+        else:
+            return_qids[nkcr_line['qid']] = [nkcr]
+
+    return return_qids
+
 
 if __name__ == '__main__':
     print_info()
     repo = pywikibot.DataSite('wikidata', 'wikidata')
 
     non_deprecated_items = get_all_non_deprecated_items()
+
+    qid_to_nkcr = make_qid_database(non_deprecated_items)
+
     chunks = load_nkcr_items()
+
     head = {'item': 'item', 'prop': 'property', 'value': 'value'}
     write_log(head, True)
 
@@ -273,13 +335,18 @@ if __name__ == '__main__':
 
                     qid = clean_qid(qid)
                     item = MyItemPage(repo, qid)
-                    datas = item.get(get_redirect=True)
+                    # datas = item.get(get_redirect=True)
                     try:
-                        nkcr_auts = get_nkcr_auts_from_item(datas)
+                        # nkcr_auts = get_nkcr_auts_from_item(datas)
+                        nkcr_auts = qid_to_nkcr.get(qid, [])
                         if nkcr_aut not in nkcr_auts:
                             try:
                                 add_nkcr_aut_to_item(item, nkcr_aut, name)
-                                non_deprecated_items[nkcr_aut] = qid
+                                non_deprecated_items[nkcr_aut] = {
+                                    'qid': qid,
+                                    'isni': [],
+                                    'orcid': []
+                                }
                             except pywikibot.exceptions.OtherPageSaveError as e:
                                 print(e)
                             except ValueError as e:
@@ -290,22 +357,12 @@ if __name__ == '__main__':
                 # print(ms)
                 if nkcr_aut in non_deprecated_items:
 
-
-                    ms = time.time()
-                    # print(ms)
-                    exist_qid = non_deprecated_items[nkcr_aut]
-                    ms = time.time()
-                    # print(ms)
+                    exist_qid = non_deprecated_items[nkcr_aut]['qid']
                     if exist_qid != '':
                         exist_qid = clean_qid(exist_qid)
-                        ms = time.time()
-                        # print(ms)
-                        process_new_fields(exist_qid, row)
-                        ms = time.time()
-                        # print(ms)
+                        process_new_fields(exist_qid, non_deprecated_items[nkcr_aut], row)
                     if qid != '' and exist_qid != qid:
-                        ms = time.time()
-                        process_new_fields(None, row, item)
+                        process_new_fields(None, non_deprecated_items[nkcr_aut], row, item)
             except BadItemException as e:
                 print(e)
             except requests.exceptions.ConnectionError as e:
