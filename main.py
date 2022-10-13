@@ -255,10 +255,6 @@ if __name__ == '__main__':
     print_info()
     repo = pywikibot.DataSite('wikidata', 'wikidata')
 
-    qid = "Q1063371"
-    item = MyItemPage(repo, qid)
-    datas = item.get(get_redirect=True)
-
     non_deprecated_items = get_all_non_deprecated_items()
     data = load_nkcr_items()
     head = {'item': 'item', 'prop': 'property', 'value': 'value'}
@@ -297,6 +293,7 @@ if __name__ == '__main__':
                 ms = time.time()
                 # print(ms)
                 if exist_qid != '':
+                    exist_qid = clean_qid(exist_qid)
                     ms = time.time()
                     # print(ms)
                     process_new_fields(exist_qid, row)
