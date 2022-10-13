@@ -235,7 +235,7 @@ def prepare_isni_from_nkcr(isni: str) -> str:
 def process_new_fields(qid_new_fields: Union[str, None], wd_data: dict, row_new_fields: object,
                        wd_item: Union[pywikibot.ItemPage, None] = None):
     # print('process')
-    if item is None:
+    if wd_item is None:
         item_new_field = MyItemPage(repo, qid_new_fields)
         # datas_new_field = item_new_field.get(get_redirect=True)
     else:
