@@ -120,8 +120,8 @@ def load_nkcr_items() -> pandas.DataFrame:
         '0247a-wikidata': 'S',
         '0247a': 'S',
         '0247a-orcid': 'S'
-    })
-    data_csv.fillna('', inplace=True)
+    }, chunksize=10000)
+    # data_csv.fillna('', inplace=True)
     return data_csv
 
 
@@ -256,53 +256,57 @@ if __name__ == '__main__':
     repo = pywikibot.DataSite('wikidata', 'wikidata')
 
     non_deprecated_items = get_all_non_deprecated_items()
-    data = load_nkcr_items()
+    chunks = load_nkcr_items()
     head = {'item': 'item', 'prop': 'property', 'value': 'value'}
     write_log(head, True)
-    for row in data.to_dict('records'):
-        nkcr_aut = row['_id']
-        print(nkcr_aut)
-        try:
-            qid = row['0247a-wikidata']
-            if qid != '':  # raději bych none, ale to tady nejde ... pandas, no
-                name = row['100a']
 
-                qid = clean_qid(qid)
-                item = MyItemPage(repo, qid)
-                datas = item.get(get_redirect=True)
-                try:
-                    nkcr_auts = get_nkcr_auts_from_item(datas)
-                    if nkcr_aut not in nkcr_auts:
-                        try:
-                            add_nkcr_aut_to_item(item, nkcr_aut, name)
-                            non_deprecated_items[nkcr_aut] = qid
-                        except pywikibot.exceptions.OtherPageSaveError as e:
-                            print(e)
-                        except ValueError as e:
-                            print(e)
-                except KeyError as e:
-                    print('key err')
-            ms = time.time()
-            # print(ms)
-            if nkcr_aut in non_deprecated_items:
+    for chunk in chunks:
+        chunk.fillna('', inplace=True)
+        chunk = chunk[chunk['100a'] != '']
+        for row in chunk.to_dict('records'):
+            nkcr_aut = row['_id']
+            print(nkcr_aut)
+            try:
+                qid = row['0247a-wikidata']
+                if qid != '':  # raději bych none, ale to tady nejde ... pandas, no
+                    name = row['100a']
 
-
+                    qid = clean_qid(qid)
+                    item = MyItemPage(repo, qid)
+                    datas = item.get(get_redirect=True)
+                    try:
+                        nkcr_auts = get_nkcr_auts_from_item(datas)
+                        if nkcr_aut not in nkcr_auts:
+                            try:
+                                add_nkcr_aut_to_item(item, nkcr_aut, name)
+                                non_deprecated_items[nkcr_aut] = qid
+                            except pywikibot.exceptions.OtherPageSaveError as e:
+                                print(e)
+                            except ValueError as e:
+                                print(e)
+                    except KeyError as e:
+                        print('key err')
                 ms = time.time()
                 # print(ms)
-                exist_qid = non_deprecated_items[nkcr_aut]
-                ms = time.time()
-                # print(ms)
-                if exist_qid != '':
-                    exist_qid = clean_qid(exist_qid)
+                if nkcr_aut in non_deprecated_items:
+
+
                     ms = time.time()
                     # print(ms)
-                    process_new_fields(exist_qid, row)
+                    exist_qid = non_deprecated_items[nkcr_aut]
                     ms = time.time()
                     # print(ms)
-                if qid != '' and exist_qid != qid:
-                    ms = time.time()
-                    process_new_fields(None, row, item)
-        except BadItemException as e:
-            print(e)
-        except requests.exceptions.ConnectionError as e:
-            print(e)
+                    if exist_qid != '':
+                        exist_qid = clean_qid(exist_qid)
+                        ms = time.time()
+                        # print(ms)
+                        process_new_fields(exist_qid, row)
+                        ms = time.time()
+                        # print(ms)
+                    if qid != '' and exist_qid != qid:
+                        ms = time.time()
+                        process_new_fields(None, row, item)
+            except BadItemException as e:
+                print(e)
+            except requests.exceptions.ConnectionError as e:
+                print(e)
