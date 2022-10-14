@@ -27,7 +27,8 @@ class MyItemPage(pywikibot.ItemPage):
 
 
 debug = True
-
+count_first_step = 0
+count_second_step = 0
 parser = argparse.ArgumentParser(description='NKČR catmandu pipeline.')
 parser.add_argument('-i', '--input', help='NKČR CSV file name', required=True)
 args = parser.parse_args()
@@ -47,7 +48,6 @@ def write_log(fields, create_file=False):
 
 def print_info():
     print('Catmandu processor for NKČR')
-
     print('TEST deploy')
     if debug:
         print('DEBUG!!!')
@@ -256,16 +256,21 @@ def process_new_fields(qid_new_fields: Union[str, None], wd_data: dict, row_new_
 
             if column == '0247a-isni':
                 row_new_fields[column] = prepare_isni_from_nkcr(row_new_fields[column])
-            if len(claims) == 0:
-                if row_new_fields[column] != '':
+
+            # if item_new_field.isRedirectPage():
+            #     #redirect
+            #     claims = item_new_field.get(get_redirect=True)
+
+            if row_new_fields[column] not in claims and row_new_fields[column] != '':
+                # insert
+                print('first')
+                datas_from_wd = item_new_field.get(get_redirect=True)
+                claim_direct_from_wd = get_claim_from_item_by_property(datas_from_wd, property_for_new_field) ##pro kontrolu
+                if row_new_fields[column] not in claim_direct_from_wd:
+                    print('second')
                     add_new_field_to_item(item_new_field, property_for_new_field, row_new_fields[column],
                                           row_new_fields['_id'])
-            else:
-                for claim_in_new_item in claims:
-                    if row_new_fields[column] != claim_in_new_item and row_new_fields[column] != '':
-                        # insert
-                        add_new_field_to_item(item_new_field, property_for_new_field, row_new_fields[column],
-                                              row_new_fields['_id'])
+
 
         except ValueError as ve:
             print(ve)
@@ -291,11 +296,19 @@ def process_new_fields(qid_new_fields: Union[str, None], wd_data: dict, row_new_
 
 def get_nkcr_auts_from_item(datas) -> list:
     nkcr_auts_from_data = []
-    claims = datas['claims'].get('P691', [])
-    for claim in claims:
-        nkcr_auts.append(claim.getTarget())
+    claims_from_wd = datas['claims'].get('P691', [])
+    for claim in claims_from_wd:
+        nkcr_auts_from_data.append(claim.getTarget())
 
     return nkcr_auts_from_data
+
+def get_claim_from_item_by_property(datas, property) -> list:
+    claims_from_data = []
+    claims_by_property = datas['claims'].get(property, [])
+    for claim in claims_by_property:
+        claims_from_data.append(claim.getTarget())
+
+    return claims_from_data
 
 
 def make_qid_database(items: dict) -> dict[str, list[str]]:
@@ -308,9 +321,9 @@ def make_qid_database(items: dict) -> dict[str, list[str]]:
 
     return return_qids
 
-
 if __name__ == '__main__':
     print_info()
+
     repo = pywikibot.DataSite('wikidata', 'wikidata')
 
     non_deprecated_items = get_all_non_deprecated_items()
@@ -327,7 +340,7 @@ if __name__ == '__main__':
         chunk = chunk[chunk['100a'] != '']
         for row in chunk.to_dict('records'):
             nkcr_aut = row['_id']
-            print(nkcr_aut)
+            # print(nkcr_aut)
             try:
                 qid = row['0247a-wikidata']
                 if qid != '':  # raději bych none, ale to tady nejde ... pandas, no
@@ -335,22 +348,24 @@ if __name__ == '__main__':
 
                     qid = clean_qid(qid)
                     item = MyItemPage(repo, qid)
-                    # datas = item.get(get_redirect=True)
+
                     try:
-                        # nkcr_auts = get_nkcr_auts_from_item(datas)
                         nkcr_auts = qid_to_nkcr.get(qid, [])
                         if nkcr_aut not in nkcr_auts:
-                            try:
-                                add_nkcr_aut_to_item(item, nkcr_aut, name)
-                                non_deprecated_items[nkcr_aut] = {
-                                    'qid': qid,
-                                    'isni': [],
-                                    'orcid': []
-                                }
-                            except pywikibot.exceptions.OtherPageSaveError as e:
-                                print(e)
-                            except ValueError as e:
-                                print(e)
+                            datas = item.get(get_redirect=True)
+                            nkcr_auts_from_wd = get_nkcr_auts_from_item(datas)
+                            if nkcr_aut not in nkcr_auts_from_wd:
+                                try:
+                                    add_nkcr_aut_to_item(item, nkcr_aut, name)
+                                    non_deprecated_items[nkcr_aut] = {
+                                        'qid': qid,
+                                        'isni': [],
+                                        'orcid': []
+                                    }
+                                except pywikibot.exceptions.OtherPageSaveError as e:
+                                    print(e)
+                                except ValueError as e:
+                                    print(e)
                     except KeyError as e:
                         print('key err')
                 ms = time.time()
@@ -367,3 +382,5 @@ if __name__ == '__main__':
                 print(e)
             except requests.exceptions.ConnectionError as e:
                 print(e)
+
+
