@@ -1,6 +1,8 @@
 import argparse
 import csv
+import json
 import re
+import uuid
 from typing import Union
 from datetime import datetime
 import pandas
@@ -10,6 +12,7 @@ from pywikibot.data import sparql
 import pandas as pd
 from os.path import exists
 import time
+from pywikibot.site._decorators import need_right, need_version
 
 from pywikibot.page._collections import (
     ClaimCollection,
@@ -25,8 +28,133 @@ class MyItemPage(pywikibot.ItemPage):
         'claims': ClaimCollection,
     }
 
+class MyDataSite(pywikibot.DataSite):
+    @need_right('edit')
+    def addClaim(self, entity, claim, bot=True, summary=None, tags=[]):
+        """
+        Add a claim.
 
-debug = True
+        :param entity: Entity to modify
+        :type entity: WikibaseEntity
+        :param claim: Claim to be added
+        :type claim: pywikibot.Claim
+        :param bot: Whether to mark the edit as a bot edit
+        :type bot: bool
+        :param summary: Edit summary
+        :type summary: str
+        """
+        claim.snak = entity.getID() + '$' + str(uuid.uuid4())
+        params = {'action': 'wbsetclaim',
+                  'claim': json.dumps(claim.toJSON()),
+                  'baserevid': entity.latest_revision_id,
+                  'summary': summary,
+                  'token': self.tokens['edit'],
+                  'bot': bot,
+                  'tags': tags
+                  }
+        req = self._simple_request(**params)
+        jsonvys = claim.toJSON()
+        data = req.submit()
+        # Update the item
+        if claim.getID() in entity.claims:
+            entity.claims[claim.getID()].append(claim)
+        else:
+            entity.claims[claim.getID()] = [claim]
+        entity.latest_revision_id = data['pageinfo']['lastrevid']
+
+    @need_right('edit')
+    def editSource(self, claim, source, new=False,
+                   bot=True, summary=None, baserevid=None, tags=[]):
+        """
+        Create/Edit a source.
+
+        :param claim: A Claim object to add the source to
+        :type claim: pywikibot.Claim
+        :param source: A Claim object to be used as a source
+        :type source: pywikibot.Claim
+        :param new: Whether to create a new one if the "source" already exists
+        :type new: bool
+        :param bot: Whether to mark the edit as a bot edit
+        :type bot: bool
+        :param summary: Edit summary
+        :type summary: str
+        :param baserevid: Base revision id override, used to detect conflicts.
+            When omitted, revision of claim.on_item is used. DEPRECATED.
+        :type baserevid: long
+        """
+        if claim.isReference or claim.isQualifier:
+            raise ValueError('The claim cannot have a source.')
+        params = {'action': 'wbsetreference', 'statement': claim.snak,
+                  'baserevid': self._get_baserevid(claim, baserevid),
+                  'summary': summary, 'bot': bot, 'token': self.tokens['edit'], 'tags': tags}
+
+        # build up the snak
+        if isinstance(source, list):
+            sources = source
+        else:
+            sources = [source]
+
+        snak = {}
+        for sourceclaim in sources:
+            datavalue = sourceclaim._formatDataValue()
+            valuesnaks = []
+            if sourceclaim.getID() in snak:
+                valuesnaks = snak[sourceclaim.getID()]
+            valuesnaks.append({'snaktype': 'value',
+                               'property': sourceclaim.getID(),
+                               'datavalue': datavalue,
+                               },
+                              )
+
+            snak[sourceclaim.getID()] = valuesnaks
+            # set the hash if the source should be changed.
+            # if present, all claims of one source have the same hash
+            if not new and hasattr(sourceclaim, 'hash'):
+                params['reference'] = sourceclaim.hash
+        params['snaks'] = json.dumps(snak)
+
+        req = self._simple_request(**params)
+        return req.submit()
+
+    @need_right('edit')
+    def editQualifier(self, claim, qualifier, new=False, bot=True,
+                      summary=None, baserevid=None, tags=[]):
+        """
+        Create/Edit a qualifier.
+
+        :param claim: A Claim object to add the qualifier to
+        :type claim: pywikibot.Claim
+        :param qualifier: A Claim object to be used as a qualifier
+        :type qualifier: pywikibot.Claim
+        :param bot: Whether to mark the edit as a bot edit
+        :type bot: bool
+        :param summary: Edit summary
+        :type summary: str
+        :param baserevid: Base revision id override, used to detect conflicts.
+            When omitted, revision of claim.on_item is used. DEPRECATED.
+        :type baserevid: long
+        """
+        if claim.isReference or claim.isQualifier:
+            raise ValueError('The claim cannot have a qualifier.')
+        params = {'action': 'wbsetqualifier', 'claim': claim.snak,
+                  'baserevid': self._get_baserevid(claim, baserevid),
+                  'summary': summary, 'bot': bot, 'tags': tags}
+
+        if (not new and hasattr(qualifier, 'hash')
+                and qualifier.hash is not None):
+            params['snakhash'] = qualifier.hash
+        params['token'] = self.tokens['edit']
+        # build up the snak
+        if qualifier.getSnakType() == 'value':
+            params['value'] = json.dumps(qualifier._formatValue())
+        params['snaktype'] = qualifier.getSnakType()
+        params['property'] = qualifier.getID()
+
+        req = self._simple_request(**params)
+        return req.submit()
+
+user_name = 'Frettiebot'
+debug = False
 count_first_step = 0
 count_second_step = 0
 parser = argparse.ArgumentParser(description='NKČR catmandu pipeline.')
@@ -86,7 +214,7 @@ def get_all_non_deprecated_items() -> dict[dict[str, list, list]]:
     query_object = sparql.SparqlQuery()
     data_non_deprecated = query_object.select(query=query, full_data=True)
 
-    non_deprecated_dictionary_cache = []
+    # non_deprecated_dictionary_cache = []
     item_non_deprecated: dict[str, Union[pywikibot.data.sparql.URI, pywikibot.data.sparql.Literal, Union[pywikibot.data.sparql.Literal,None], Union[pywikibot.data.sparql.Literal, None]]]
     for item_non_deprecated in data_non_deprecated:
         if item_non_deprecated['isni'] is not None:
@@ -183,12 +311,12 @@ def add_nkcr_aut_to_item(item_to_add: pywikibot.ItemPage, nkcr_aut_to_add: str, 
         write_log(final)
         # print(final)
     else:
-        item_to_add.addClaim(new_claim)
+        item_to_add.addClaim(new_claim, tags=['Czech-Authorities-Sync'])
         sources.append(source_nkcr)
         sources.append(source_nkcr_aut)
         sources.append(source_date)
-        new_claim.addSources(sources)
-        new_claim.addQualifier(qualifier)
+        new_claim.addSources(sources, tags=['Czech-Authorities-Sync'])
+        new_claim.addQualifier(qualifier, tags=['Czech-Authorities-Sync'])
 
 
 def add_new_field_to_item(item_new_field: pywikibot.ItemPage, property_new_field: str, value: object,
@@ -211,11 +339,11 @@ def add_new_field_to_item(item_new_field: pywikibot.ItemPage, property_new_field
         final = {'item': item_new_field.getID(), 'prop': property_new_field, 'value': value}
         write_log(final)
     else:
-        item_new_field.addClaim(new_claim)
+        item_new_field.addClaim(new_claim, tags=['Czech-Authorities-Sync'])
         sources.append(source_nkcr)
         sources.append(source_nkcr_aut)
         sources.append(source_date)
-        new_claim.addSources(sources)
+        new_claim.addSources(sources, tags=['Czech-Authorities-Sync'])
 
 
 def prepare_isni_from_nkcr(isni: str) -> str:
@@ -236,7 +364,10 @@ def process_new_fields(qid_new_fields: Union[str, None], wd_data: dict, row_new_
                        wd_item: Union[pywikibot.ItemPage, None] = None):
     # print('process')
     if wd_item is None:
-        item_new_field = MyItemPage(repo, qid_new_fields)
+        item_new_field = pywikibot.ItemPage(repo, qid_new_fields)
+        if (item_new_field.isRedirectPage()):
+            item_new_field = item_new_field.getRedirectTarget()
+            item_new_field.get(get_redirect=True)
         # datas_new_field = item_new_field.get(get_redirect=True)
     else:
         item_new_field = wd_item
@@ -263,11 +394,9 @@ def process_new_fields(qid_new_fields: Union[str, None], wd_data: dict, row_new_
 
             if row_new_fields[column] not in claims and row_new_fields[column] != '':
                 # insert
-                print('first')
                 datas_from_wd = item_new_field.get(get_redirect=True)
                 claim_direct_from_wd = get_claim_from_item_by_property(datas_from_wd, property_for_new_field) ##pro kontrolu
                 if row_new_fields[column] not in claim_direct_from_wd:
-                    print('second')
                     add_new_field_to_item(item_new_field, property_for_new_field, row_new_fields[column],
                                           row_new_fields['_id'])
 
@@ -324,7 +453,7 @@ def make_qid_database(items: dict) -> dict[str, list[str]]:
 if __name__ == '__main__':
     print_info()
 
-    repo = pywikibot.DataSite('wikidata', 'wikidata')
+    repo = MyDataSite('wikidata', 'wikidata', user=user_name)
 
     non_deprecated_items = get_all_non_deprecated_items()
 
@@ -347,7 +476,7 @@ if __name__ == '__main__':
                     name = row['100a']
 
                     qid = clean_qid(qid)
-                    item = MyItemPage(repo, qid)
+                    item = pywikibot.ItemPage(repo, qid)
 
                     try:
                         nkcr_auts = qid_to_nkcr.get(qid, [])
@@ -356,6 +485,9 @@ if __name__ == '__main__':
                             nkcr_auts_from_wd = get_nkcr_auts_from_item(datas)
                             if nkcr_aut not in nkcr_auts_from_wd:
                                 try:
+                                    if (item.isRedirectPage()):
+                                        item = item.getRedirectTarget()
+                                        item.get(get_redirect=True)
                                     add_nkcr_aut_to_item(item, nkcr_aut, name)
                                     non_deprecated_items[nkcr_aut] = {
                                         'qid': qid,
@@ -377,6 +509,9 @@ if __name__ == '__main__':
                         exist_qid = clean_qid(exist_qid)
                         process_new_fields(exist_qid, non_deprecated_items[nkcr_aut], row)
                     if qid != '' and exist_qid != qid:
+                        if (item.isRedirectPage()):
+                            item = item.getRedirectTarget()
+                            item.get(get_redirect=True)
                         process_new_fields(None, non_deprecated_items[nkcr_aut], row, item)
             except BadItemException as e:
                 print(e)
