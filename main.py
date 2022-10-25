@@ -154,7 +154,7 @@ class MyDataSite(pywikibot.DataSite):
         return req.submit()
 
 user_name = 'Frettiebot'
-debug = False
+debug = True
 count_first_step = 0
 count_second_step = 0
 parser = argparse.ArgumentParser(description='NKČR catmandu pipeline.')
