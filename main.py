@@ -365,9 +365,9 @@ def process_new_fields(qid_new_fields: Union[str, None], wd_data: dict, row_new_
     # print('process')
     if wd_item is None:
         item_new_field = pywikibot.ItemPage(repo, qid_new_fields)
-        if (item_new_field.isRedirectPage()):
-            item_new_field = item_new_field.getRedirectTarget()
-            item_new_field.get(get_redirect=True)
+        # if (item_new_field.isRedirectPage()):
+        #     item_new_field = item_new_field.getRedirectTarget()
+        #     item_new_field.get(get_redirect=True)
         # datas_new_field = item_new_field.get(get_redirect=True)
     else:
         item_new_field = wd_item
@@ -394,6 +394,9 @@ def process_new_fields(qid_new_fields: Union[str, None], wd_data: dict, row_new_
 
             if row_new_fields[column] not in claims and row_new_fields[column] != '':
                 # insert
+                if (item_new_field.isRedirectPage()):
+                    item_new_field = item_new_field.getRedirectTarget()
+                    # item_new_field.get(get_redirect=True)
                 datas_from_wd = item_new_field.get(get_redirect=True)
                 claim_direct_from_wd = get_claim_from_item_by_property(datas_from_wd, property_for_new_field) ##pro kontrolu
                 if row_new_fields[column] not in claim_direct_from_wd:
@@ -469,7 +472,7 @@ if __name__ == '__main__':
         chunk = chunk[chunk['100a'] != '']
         for row in chunk.to_dict('records'):
             nkcr_aut = row['_id']
-            # print(nkcr_aut)
+            print(nkcr_aut)
             try:
                 qid = row['0247a-wikidata']
                 if qid != '':  # raději bych none, ale to tady nejde ... pandas, no
