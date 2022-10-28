@@ -176,7 +176,6 @@ def write_log(fields, create_file=False):
 
 def print_info():
     print('Catmandu processor for NKČR')
-    print('TEST deploy')
     if debug:
         print('DEBUG!!!')
 
