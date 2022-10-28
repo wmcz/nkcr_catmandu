@@ -85,7 +85,7 @@ class MyDataSite(pywikibot.DataSite):
         if claim.isReference or claim.isQualifier:
             raise ValueError('The claim cannot have a source.')
         params = {'action': 'wbsetreference', 'statement': claim.snak,
-                  'baserevid': self._get_baserevid(claim, baserevid),
+                  'baserevid': claim.on_item.latest_revision_id,
                   'summary': summary, 'bot': bot, 'token': self.tokens['edit'], 'tags': tags}
 
         # build up the snak
@@ -137,7 +137,7 @@ class MyDataSite(pywikibot.DataSite):
         if claim.isReference or claim.isQualifier:
             raise ValueError('The claim cannot have a qualifier.')
         params = {'action': 'wbsetqualifier', 'claim': claim.snak,
-                  'baserevid': self._get_baserevid(claim, baserevid),
+                  'baserevid': claim.on_item.latest_revision_id,
                   'summary': summary, 'bot': bot, 'tags': tags}
 
         if (not new and hasattr(qualifier, 'hash')
@@ -154,7 +154,7 @@ class MyDataSite(pywikibot.DataSite):
         return req.submit()
 
 user_name = 'Frettiebot'
-debug = True
+debug = False
 count_first_step = 0
 count_second_step = 0
 parser = argparse.ArgumentParser(description='NKČR catmandu pipeline.')
