@@ -197,12 +197,7 @@ def clean_qid(string: str) -> str:
 
 def get_all_non_deprecated_items() -> dict[dict[str, list, list]]:
     non_deprecated_dictionary: dict[dict[str, list, list]] = {}
-    if exists('cache.csv'):
-        with open('cache.csv') as csvfile:
-            lines = csv.DictReader(csvfile)
-            for line in lines:
-                non_deprecated_dictionary[line['nkcr']] = line['qid']
-        return non_deprecated_dictionary
+
     query = """
     select ?item ?nkcr ?isni ?orcid where {
         ?item p:P691 [ps:P691 ?nkcr ; wikibase:rank ?rank ] filter(?rank != wikibase:DeprecatedRank) .
@@ -248,14 +243,6 @@ def get_all_non_deprecated_items() -> dict[dict[str, list, list]]:
                 'isni': isni_add,
                 'orcid': orcid_add,
             }
-
-        # non_deprecated_dictionary_cache.append(
-        #     {'nkcr': item_non_deprecated['nkcr'].value, 'qid': item_non_deprecated['item'].getID()})
-
-    # with open('cache.csv', 'w') as csvfile:
-    #     writer = csv.DictWriter(csvfile, fieldnames=['nkcr', 'qid'])
-    #     writer.writeheader()
-    #     writer.writerows(non_deprecated_dictionary_cache)
 
     return non_deprecated_dictionary
 
@@ -358,6 +345,17 @@ def prepare_isni_from_nkcr(isni: str) -> str:
         str_chunks = [isni[i:i + n] for i in range(0, len(isni), n)]
         return ' '.join(str_chunks)
 
+def prepare_orcid_from_nkcr(orcid: str) -> str:
+    # https://pythonexamples.org/python-split-string-into-specific-length-chunks/
+    orcid = orcid.replace(' ', '')
+    regex = u"^(\d{4}-){3}\d{3}(\d|X)$"
+
+    match = re.search(regex, orcid, re.IGNORECASE)
+    if not match:
+        return ''
+    else:
+        return orcid
+
 
 def process_new_fields(qid_new_fields: Union[str, None], wd_data: dict, row_new_fields: object,
                        wd_item: Union[pywikibot.ItemPage, None] = None):
@@ -386,6 +384,9 @@ def process_new_fields(qid_new_fields: Union[str, None], wd_data: dict, row_new_
 
             if column == '0247a-isni':
                 row_new_fields[column] = prepare_isni_from_nkcr(row_new_fields[column])
+
+            if column == '0247a-orcid':
+                row_new_fields[column] = prepare_orcid_from_nkcr(row_new_fields[column])
 
             # if item_new_field.isRedirectPage():
             #     #redirect
