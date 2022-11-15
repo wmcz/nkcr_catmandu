@@ -1,0 +1,2 @@
+class BadItemException(Exception):
+    pass
