@@ -2,13 +2,13 @@
 
 
 
-## Návrh pipeline
+## Pipeline
 
-Dump Opendata NK (MARC XML) → catmandu na serveru → CSV s kompletním exportem důležitých polí z Autorit (bez neschválených záznamů!!!) → Frettiebot/python skripty → Wikidata
+Dump Opendata NK (MARC XML) → catmandu na serveru → CSV s kompletním exportem důležitých polí z Autorit → Frettiebot/python skripty → Wikidata
 
 ## Logika
 
-Podrobnější logika pro první fázi
+Podrobnější logika pro první fázi (pro aktuální stav prosím viz kód)
 
 Nejprve - stáhnout si pomocné soubory:
 
