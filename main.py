@@ -130,5 +130,7 @@ if __name__ == '__main__':
                         process_new_fields(None, non_deprecated_items[nkcr_aut], row, item)
             except BadItemException as e:
                 print(e)
+            except pywikibot.exceptions.NoPageError as e:
+                print(e)
             except requests.exceptions.ConnectionError as e:
                 print(e)
