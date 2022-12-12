@@ -102,7 +102,34 @@ def make_qid_database(items: dict) -> dict[str, list[str]]:
 
     return return_qids
 
-def get_all_non_deprecated_items() -> dict[dict[str, list, list]]:
+def get_occupations():
+    query = """
+    select distinct ?item ?value ?string where {
+
+        ?item p:P691 ?s .
+        ?s wikibase:rank ?rank filter(?rank != wikibase:DeprecatedRank) .
+        ?s ps:P691 ?value filter(strstarts(str(?value),"ph")) .
+        ?s pq:P1810 ?string .
+    }
+    """
+
+    query_object = sparql.SparqlQuery()
+    data_occupation = query_object.select(query=query, full_data=True)
+
+    occupation_dictionary: dict[dict[str, list, list]] = {}
+
+    for item_occupation in data_occupation:
+        if item_occupation['string'] is not None:
+            name = item_occupation['string'].value
+        else:
+            name = None
+
+        if item_occupation['item'].getID() is not None:
+            occupation_dictionary[name] = item_occupation['item'].getID()
+
+    return occupation_dictionary
+
+def get_all_non_deprecated_items(limit:Union[int,None] = None) -> dict[dict[str, list, list]]:
     non_deprecated_dictionary: dict[dict[str, list, list]] = {}
 
     query = """
@@ -112,6 +139,10 @@ def get_all_non_deprecated_items() -> dict[dict[str, list, list]]:
         OPTIONAL{?item wdt:P496 ?orcid}.
     }
     """
+
+    if (limit is not None):
+        query = query + ' LIMIT ' + str(limit)
+
     query_object = sparql.SparqlQuery()
     data_non_deprecated = query_object.select(query=query, full_data=True)
 
@@ -154,6 +185,49 @@ def get_all_non_deprecated_items() -> dict[dict[str, list, list]]:
             }
 
     return non_deprecated_dictionary
+
+def get_all_non_deprecated_items_occupation(limit:Union[int,None] = None) -> dict[dict[str, list, list]]:
+    non_deprecated_dictionary: dict[dict[str, list, list]] = {}
+
+    query = """
+    select ?item ?nkcr ?occup where {
+        ?item p:P691 [ps:P691 ?nkcr ; wikibase:rank ?rank ] filter(?rank != wikibase:DeprecatedRank) .
+        OPTIONAL{?item wdt:P106 ?occup}.
+        
+    } 
+    """
+    if (limit is not None):
+        query = query + ' LIMIT ' + str(limit)
+
+    query_object = sparql.SparqlQuery()
+    data_non_deprecated = query_object.select(query=query, full_data=True)
+
+    # non_deprecated_dictionary_cache = []
+    item_non_deprecated: dict[str, Union[
+        pywikibot.data.sparql.URI, pywikibot.data.sparql.Literal, Union[pywikibot.data.sparql.Literal, None], Union[
+            pywikibot.data.sparql.Literal, None]]]
+    for item_non_deprecated in data_non_deprecated:
+        if item_non_deprecated['occup'] is not None:
+            occupation = item_non_deprecated['occup'].getID()
+        else:
+            occupation = None
+
+        if non_deprecated_dictionary.get(item_non_deprecated['nkcr'].value, None):
+            if occupation is not None:
+                non_deprecated_dictionary[item_non_deprecated['nkcr'].value]['occup'].append(occupation)
+        else:
+            if occupation is not None:
+                occupation_add = [occupation]
+            else:
+                occupation_add = []
+
+            non_deprecated_dictionary[item_non_deprecated['nkcr'].value] = {
+                'qid': item_non_deprecated['item'].getID(),
+                'occup': occupation_add,
+            }
+
+    return non_deprecated_dictionary
+
 
 def load_nkcr_items(file_name) -> pandas.DataFrame:
     data_csv = pd.read_csv(file_name, dtype={

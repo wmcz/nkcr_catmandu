@@ -5,12 +5,14 @@ import requests
 
 import time
 
+import cleaners
 from cleaners import clean_last_comma, clean_qid, \
     prepare_column_of_content, resolve_exist_claims
 from nkcr_exceptions import BadItemException
 from pywikibot_extension import MyDataSite
 from tools import write_log, print_info, add_new_field_to_item, get_nkcr_auts_from_item, make_qid_database, \
-    get_all_non_deprecated_items, load_nkcr_items, get_claim_from_item_by_property, add_nkcr_aut_to_item
+    get_all_non_deprecated_items, load_nkcr_items, get_claim_from_item_by_property, add_nkcr_aut_to_item, \
+    get_all_non_deprecated_items_occupation, get_occupations
 
 user_name = 'Frettiebot'
 debug = False
@@ -26,7 +28,7 @@ file_name = args.input
 
 # isni = P213
 # orcid = P496
-properties = {'0247a-isni': 'P213', '0247a-orcid': 'P496'}
+properties = {'0247a-isni': 'P213', '0247a-orcid': 'P496', '374a' : 'P106'}
 
 def process_new_fields(qid_new_fields: Union[str, None], wd_data: dict, row_new_fields: dict,
                        wd_item: Union[pywikibot.ItemPage, None] = None):
@@ -43,17 +45,33 @@ def process_new_fields(qid_new_fields: Union[str, None], wd_data: dict, row_new_
 
             row_new_fields[column] = prepare_column_of_content(column, row_new_fields)
 
-            if row_new_fields[column] not in claims and row_new_fields[column] != '':
+            if row_new_fields[column] not in claims and len(row_new_fields[column]) > 0:
                 # insert
                 if (item_new_field.isRedirectPage()):
                     item_new_field = item_new_field.getRedirectTarget()
 
                 datas_from_wd = item_new_field.get(get_redirect=True)
                 claim_direct_from_wd = get_claim_from_item_by_property(datas_from_wd,
-                                                                       property_for_new_field)  # pro kontrolu
-                if row_new_fields[column] not in claim_direct_from_wd:
-                    add_new_field_to_item(debug, repo, item_new_field, property_for_new_field, row_new_fields[column],
-                                          row_new_fields['_id'])
+                                                                       property_for_new_field) # pro kontrolu
+
+                if type(row_new_fields[column]) is list:
+                    qid_claims_direct_from_wd = []
+                    for cdfwd in claim_direct_from_wd:
+                        qid_claims_direct_from_wd.append(cdfwd.getID())
+                    for item_in_list in row_new_fields[column]:
+                        item_occupation = pywikibot.ItemPage(repo, item_in_list)
+
+                        if item_occupation.getID() not in qid_claims_direct_from_wd:
+                            if row_new_fields[column] not in claim_direct_from_wd:
+                                add_new_field_to_item(debug, repo, item_new_field, property_for_new_field,
+                                                      item_occupation,
+                                                      row_new_fields['_id'])
+                else:
+                    if row_new_fields[column] not in claim_direct_from_wd:
+                        add_new_field_to_item(debug, repo, item_new_field, property_for_new_field,
+                                              row_new_fields[column],
+                                              row_new_fields['_id'])
+
 
         except ValueError as ve:
             print(ve)
@@ -70,10 +88,14 @@ if __name__ == '__main__':
 
     repo = MyDataSite('wikidata', 'wikidata', user=user_name)
 
+    non_deprecated_items_occupation = get_all_non_deprecated_items_occupation()
     non_deprecated_items = get_all_non_deprecated_items()
+    # non_deprecated_items = {}
+
+    name_to_nkcr = get_occupations()
 
     qid_to_nkcr = make_qid_database(non_deprecated_items)
-
+    cleaners.name_to_nkcr = name_to_nkcr
     chunks = load_nkcr_items(file_name)
 
     head = {'item': 'item', 'prop': 'property', 'value': 'value'}
@@ -128,6 +150,16 @@ if __name__ == '__main__':
                             item = item.getRedirectTarget()
                             item.get(get_redirect=True)
                         process_new_fields(None, non_deprecated_items[nkcr_aut], row, item)
+                if nkcr_aut in non_deprecated_items_occupation:
+                    exist_qid = non_deprecated_items_occupation[nkcr_aut]['qid']
+                    if exist_qid != '':
+                        exist_qid = clean_qid(exist_qid)
+                        process_new_fields(exist_qid, non_deprecated_items_occupation[nkcr_aut], row)
+                    if qid != '' and exist_qid != qid:
+                        if (item.isRedirectPage()):
+                            item = item.getRedirectTarget()
+                            item.get(get_redirect=True)
+                        process_new_fields(None, non_deprecated_items_occupation[nkcr_aut], row, item)
             except BadItemException as e:
                 print(e)
             except pywikibot.exceptions.NoPageError as e:
