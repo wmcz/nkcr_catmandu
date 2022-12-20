@@ -1,5 +1,5 @@
 import csv
-from typing import Union
+from typing import Union, Any
 
 import pandas
 import pandas as pd
@@ -22,9 +22,9 @@ def write_log(fields, create_file=False):
     csvfile.close()
 
 def print_info(debug):
-    print('Catmandu processor for NKČR')
+    log_with_date_time('Catmandu processor for NKČR')
     if debug:
-        print('DEBUG!!!')
+        log_with_date_time('DEBUG!!!')
 
 def add_new_field_to_item(debug: bool, repo: pywikibot_extension.MyDataSite, item_new_field: pywikibot.ItemPage, property_new_field: str, value: object,
                           nkcr_aut_new_field: str):
@@ -43,6 +43,8 @@ def add_new_field_to_item(debug: bool, repo: pywikibot_extension.MyDataSite, ite
     new_claim = pywikibot.Claim(repo, property_new_field)
     new_claim.setTarget(value)
     if debug:
+        if (type(value) is pywikibot.ItemPage):
+            value = value.getID()
         final = {'item': item_new_field.getID(), 'prop': property_new_field, 'value': value}
         write_log(final)
     else:
@@ -137,6 +139,7 @@ def get_all_non_deprecated_items(limit:Union[int,None] = None) -> dict[dict[str,
         ?item p:P691 [ps:P691 ?nkcr ; wikibase:rank ?rank ] filter(?rank != wikibase:DeprecatedRank) .
         OPTIONAL{?item wdt:P213 ?isni}.
         OPTIONAL{?item wdt:P496 ?orcid}.
+        # VALUES ?nkcr {'jk01010030' 'mzk2004248910' 'xx0278251'}
     }
     """
 
@@ -193,6 +196,7 @@ def get_all_non_deprecated_items_occupation(limit:Union[int,None] = None) -> dic
     select ?item ?nkcr ?occup where {
         ?item p:P691 [ps:P691 ?nkcr ; wikibase:rank ?rank ] filter(?rank != wikibase:DeprecatedRank) .
         OPTIONAL{?item wdt:P106 ?occup}.
+          # VALUES ?nkcr {'jk01010030' 'mzk2004248910' 'xx0278251'} 
         
     } 
     """
@@ -255,10 +259,31 @@ def load_nkcr_items(file_name) -> pandas.DataFrame:
     # data_csv.fillna('', inplace=True)
     return data_csv
 
-def get_claim_from_item_by_property(datas, property) -> list:
+def get_claim_from_item_by_property(datas: dict[str, Any], property: str) -> list:
     claims_from_data = []
     claims_by_property = datas['claims'].get(property, [])
     for claim in claims_by_property:
         claims_from_data.append(claim.getTarget())
 
     return claims_from_data
+
+def is_item_subclass_of(item: pywikibot.ItemPage, subclass: pywikibot.ItemPage):
+    query = """
+    select ?item where  {
+        values ?item {wd:""" + item.getID() + """}
+        ?item wdt:P31/wdt:P279* wd:""" + subclass.getID() + """ .
+    }
+    """
+
+    query_object = sparql.SparqlQuery()
+    data_is_subclass = query_object.select(query=query, full_data=False)
+    if (len(data_is_subclass) == 0):
+        # not subclass of
+        return False
+    else:
+        return True
+
+def log_with_date_time(message:str = ''):
+    datetime_object = datetime.now()
+    formatted_time = datetime_object.strftime("%H:%M:%S")
+    print(formatted_time + ": " + message)

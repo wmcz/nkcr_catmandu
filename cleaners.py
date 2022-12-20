@@ -1,4 +1,5 @@
 import re
+from typing import Union
 
 from nkcr_exceptions import BadItemException
 
@@ -28,17 +29,26 @@ def prepare_orcid_from_nkcr(orcid: str) -> str:
     else:
         return orcid
 
-def prepare_occupation_from_nkcr(occupation_string: str) -> str:
+def prepare_occupation_from_nkcr(occupation_string: str) -> Union[str,list]:
     nkcr_to_qid = name_to_nkcr
-    splitted_occupations = occupation_string.split('|')
     occupations = []
-    for occupation in splitted_occupations:
+    # log_with_date_time(occupation_string)
+    if (type(occupation_string) == str):
+        if (occupation_string.strip() == ''):
+            return occupations
+        splitted_occupations = occupation_string.strip().split('|')
+
         try:
-            occupation_qid = nkcr_to_qid[occupation]
-            occupations.append(clean_qid(occupation_qid))
+            occupations = [nkcr_to_qid[occupation] for occupation in splitted_occupations]
         except KeyError as e:
             print(e)
-            pass
+        # for occupation in splitted_occupations:
+        #     try:
+        #         occupation_qid = nkcr_to_qid[occupation]
+        #         occupations.append(clean_qid(occupation_qid))
+        #     except KeyError as e:
+        #         print(e)
+        #         pass
     return occupations
 
 
