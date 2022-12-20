@@ -1,7 +1,9 @@
 import re
+from typing import Union
 
 from nkcr_exceptions import BadItemException
 
+name_to_nkcr = {}
 
 def clean_last_comma(string: str) -> str:
     if string.endswith(','):
@@ -27,6 +29,29 @@ def prepare_orcid_from_nkcr(orcid: str) -> str:
     else:
         return orcid
 
+def prepare_occupation_from_nkcr(occupation_string: str) -> Union[str,list]:
+    nkcr_to_qid = name_to_nkcr
+    occupations = []
+    # log_with_date_time(occupation_string)
+    if (type(occupation_string) == str):
+        if (occupation_string.strip() == ''):
+            return occupations
+        splitted_occupations = occupation_string.strip().split('|')
+
+        try:
+            occupations = [nkcr_to_qid[occupation] for occupation in splitted_occupations]
+        except KeyError as e:
+            print(e)
+        # for occupation in splitted_occupations:
+        #     try:
+        #         occupation_qid = nkcr_to_qid[occupation]
+        #         occupations.append(clean_qid(occupation_qid))
+        #     except KeyError as e:
+        #         print(e)
+        #         pass
+    return occupations
+
+
 def prepare_isni_from_nkcr(isni: str) -> str:
     # https://pythonexamples.org/python-split-string-into-specific-length-chunks/
     isni = isni.replace(' ', '')
@@ -43,7 +68,8 @@ def prepare_isni_from_nkcr(isni: str) -> str:
 def prepare_column_of_content(column, row):
     column_to_method_dictionary = {
         '0247a-isni': prepare_isni_from_nkcr,
-        '0247a-orcid': prepare_orcid_from_nkcr
+        '0247a-orcid': prepare_orcid_from_nkcr,
+        '374a': prepare_occupation_from_nkcr
     }
     return column_to_method_dictionary[column](row[column])
 
@@ -53,4 +79,6 @@ def resolve_exist_claims(column, wd_data):
         claims = wd_data['isni']
     if column == '0247a-orcid':
         claims = wd_data['orcid']
+    if column == '374a':
+        claims = wd_data['occup']
     return claims

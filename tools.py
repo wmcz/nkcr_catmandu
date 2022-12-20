@@ -1,5 +1,5 @@
 import csv
-from typing import Union
+from typing import Union, Any
 
 import pandas
 import pandas as pd
@@ -22,9 +22,9 @@ def write_log(fields, create_file=False):
     csvfile.close()
 
 def print_info(debug):
-    print('Catmandu processor for NKČR')
+    log_with_date_time('Catmandu processor for NKČR')
     if debug:
-        print('DEBUG!!!')
+        log_with_date_time('DEBUG!!!')
 
 def add_new_field_to_item(debug: bool, repo: pywikibot_extension.MyDataSite, item_new_field: pywikibot.ItemPage, property_new_field: str, value: object,
                           nkcr_aut_new_field: str):
@@ -43,6 +43,8 @@ def add_new_field_to_item(debug: bool, repo: pywikibot_extension.MyDataSite, ite
     new_claim = pywikibot.Claim(repo, property_new_field)
     new_claim.setTarget(value)
     if debug:
+        if (type(value) is pywikibot.ItemPage):
+            value = value.getID()
         final = {'item': item_new_field.getID(), 'prop': property_new_field, 'value': value}
         write_log(final)
     else:
@@ -102,7 +104,34 @@ def make_qid_database(items: dict) -> dict[str, list[str]]:
 
     return return_qids
 
-def get_all_non_deprecated_items() -> dict[dict[str, list, list]]:
+def get_occupations():
+    query = """
+    select distinct ?item ?value ?string where {
+
+        ?item p:P691 ?s .
+        ?s wikibase:rank ?rank filter(?rank != wikibase:DeprecatedRank) .
+        ?s ps:P691 ?value filter(strstarts(str(?value),"ph")) .
+        ?s pq:P1810 ?string .
+    }
+    """
+
+    query_object = sparql.SparqlQuery()
+    data_occupation = query_object.select(query=query, full_data=True)
+
+    occupation_dictionary: dict[dict[str, list, list]] = {}
+
+    for item_occupation in data_occupation:
+        if item_occupation['string'] is not None:
+            name = item_occupation['string'].value
+        else:
+            name = None
+
+        if item_occupation['item'].getID() is not None:
+            occupation_dictionary[name] = item_occupation['item'].getID()
+
+    return occupation_dictionary
+
+def get_all_non_deprecated_items(limit:Union[int,None] = None) -> dict[dict[str, list, list]]:
     non_deprecated_dictionary: dict[dict[str, list, list]] = {}
 
     query = """
@@ -110,8 +139,13 @@ def get_all_non_deprecated_items() -> dict[dict[str, list, list]]:
         ?item p:P691 [ps:P691 ?nkcr ; wikibase:rank ?rank ] filter(?rank != wikibase:DeprecatedRank) .
         OPTIONAL{?item wdt:P213 ?isni}.
         OPTIONAL{?item wdt:P496 ?orcid}.
+        # VALUES ?nkcr {'jk01010030' 'mzk2004248910' 'xx0278251'}
     }
     """
+
+    if (limit is not None):
+        query = query + ' LIMIT ' + str(limit)
+
     query_object = sparql.SparqlQuery()
     data_non_deprecated = query_object.select(query=query, full_data=True)
 
@@ -155,6 +189,50 @@ def get_all_non_deprecated_items() -> dict[dict[str, list, list]]:
 
     return non_deprecated_dictionary
 
+def get_all_non_deprecated_items_occupation(limit:Union[int,None] = None) -> dict[dict[str, list, list]]:
+    non_deprecated_dictionary: dict[dict[str, list, list]] = {}
+
+    query = """
+    select ?item ?nkcr ?occup where {
+        ?item p:P691 [ps:P691 ?nkcr ; wikibase:rank ?rank ] filter(?rank != wikibase:DeprecatedRank) .
+        OPTIONAL{?item wdt:P106 ?occup}.
+          # VALUES ?nkcr {'jk01010030' 'mzk2004248910' 'xx0278251'} 
+        
+    } 
+    """
+    if (limit is not None):
+        query = query + ' LIMIT ' + str(limit)
+
+    query_object = sparql.SparqlQuery()
+    data_non_deprecated = query_object.select(query=query, full_data=True)
+
+    # non_deprecated_dictionary_cache = []
+    item_non_deprecated: dict[str, Union[
+        pywikibot.data.sparql.URI, pywikibot.data.sparql.Literal, Union[pywikibot.data.sparql.Literal, None], Union[
+            pywikibot.data.sparql.Literal, None]]]
+    for item_non_deprecated in data_non_deprecated:
+        if item_non_deprecated['occup'] is not None:
+            occupation = item_non_deprecated['occup'].getID()
+        else:
+            occupation = None
+
+        if non_deprecated_dictionary.get(item_non_deprecated['nkcr'].value, None):
+            if occupation is not None:
+                non_deprecated_dictionary[item_non_deprecated['nkcr'].value]['occup'].append(occupation)
+        else:
+            if occupation is not None:
+                occupation_add = [occupation]
+            else:
+                occupation_add = []
+
+            non_deprecated_dictionary[item_non_deprecated['nkcr'].value] = {
+                'qid': item_non_deprecated['item'].getID(),
+                'occup': occupation_add,
+            }
+
+    return non_deprecated_dictionary
+
+
 def load_nkcr_items(file_name) -> pandas.DataFrame:
     data_csv = pd.read_csv(file_name, dtype={
         '_id': 'S',
@@ -181,10 +259,31 @@ def load_nkcr_items(file_name) -> pandas.DataFrame:
     # data_csv.fillna('', inplace=True)
     return data_csv
 
-def get_claim_from_item_by_property(datas, property) -> list:
+def get_claim_from_item_by_property(datas: dict[str, Any], property: str) -> list:
     claims_from_data = []
     claims_by_property = datas['claims'].get(property, [])
     for claim in claims_by_property:
         claims_from_data.append(claim.getTarget())
 
     return claims_from_data
+
+def is_item_subclass_of(item: pywikibot.ItemPage, subclass: pywikibot.ItemPage):
+    query = """
+    select ?item where  {
+        values ?item {wd:""" + item.getID() + """}
+        ?item wdt:P31/wdt:P279* wd:""" + subclass.getID() + """ .
+    }
+    """
+
+    query_object = sparql.SparqlQuery()
+    data_is_subclass = query_object.select(query=query, full_data=False)
+    if (len(data_is_subclass) == 0):
+        # not subclass of
+        return False
+    else:
+        return True
+
+def log_with_date_time(message:str = ''):
+    datetime_object = datetime.now()
+    formatted_time = datetime_object.strftime("%H:%M:%S")
+    print(formatted_time + ": " + message)
