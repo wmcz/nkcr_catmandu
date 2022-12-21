@@ -119,6 +119,8 @@ if __name__ == '__main__':
     head = {'item': 'item', 'prop': 'property', 'value': 'value'}
     write_log(head, True)
 
+    count = 0
+
     for chunk in chunks:
         chunk.fillna('', inplace=True)
         chunk = chunk[chunk['100a'] != '']
@@ -128,7 +130,13 @@ if __name__ == '__main__':
             # if logger.isCompleteFile(nkcr_aut):
             #     continue
 
-            log_with_date_time(nkcr_aut)
+            count = count + 1
+
+            if (count % 10000 == 0):
+                log_with_date_time('line: ' + str(count))
+
+            if (count % 1000) == 0:
+                log_with_date_time('line ' + str(count) + ' - ' + nkcr_aut)
 
             try:
                 qid = row['0247a-wikidata']

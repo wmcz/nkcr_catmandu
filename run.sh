@@ -12,6 +12,6 @@ echo "Extracted AUT XML GZ"
 echo "Converted to CSV"
 cp output.csv /var/www/autority.wikimedia.cz/output.csv
 echo "Copied output.csv to autorita.wikimedia.cz"
-rm cache.csv
+#rm cache.csv
 . /home/frettie/nkcr_catmandu_pipeline/bin/activate && python3 /home/frettie/nkcr_catmandu_pipeline/main.py --input /home/frettie/nkcr_catmandu_pipeline/output.csv ; deactivate
 
