@@ -189,7 +189,7 @@ def get_all_non_deprecated_items(limit:Union[int,None] = None) -> dict[dict[str,
 
     return non_deprecated_dictionary
 
-def get_all_non_deprecated_items_occupation(limit:Union[int,None] = None) -> dict[dict[str, list, list]]:
+def get_all_non_deprecated_items_occupation(limit:Union[int,None] = None, offset:Union[int,None] = None) -> dict[dict[str, list, list]]:
     non_deprecated_dictionary: dict[dict[str, list, list]] = {}
 
     query = """
@@ -198,10 +198,10 @@ def get_all_non_deprecated_items_occupation(limit:Union[int,None] = None) -> dic
         OPTIONAL{?item wdt:P106 ?occup}.
           # VALUES ?nkcr {'jk01010030' 'mzk2004248910' 'xx0278251'} 
         
-    } 
+    } LIMIT """ + str(limit) + """ OFFSET """ + str(offset) + """
     """
-    if (limit is not None):
-        query = query + ' LIMIT ' + str(limit)
+    # if (limit is not None):
+    #     query = query + ' LIMIT ' + str(limit)
 
     query_object = sparql.SparqlQuery()
     data_non_deprecated = query_object.select(query=query, full_data=True)

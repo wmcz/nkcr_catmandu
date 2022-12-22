@@ -99,7 +99,24 @@ if __name__ == '__main__':
     repo = MyDataSite('wikidata', 'wikidata', user=user_name)
 
     log_with_date_time('run')
-    non_deprecated_items_occupation = get_all_non_deprecated_items_occupation()
+    i = 0
+    run = True
+    fin = {}
+    while run:
+        lim = 10000
+
+        offset = i * 10000
+        if (i % 10 == 0):
+            print(offset)
+        non_deprecated_items_occupation = get_all_non_deprecated_items_occupation(lim, offset)
+        if (len(fin) == 0):
+            fin = non_deprecated_items_occupation
+        else:
+            fin.update(non_deprecated_items_occupation)
+        if (len(non_deprecated_items_occupation) == 0):
+            run = False
+        i = i + 1
+
     log_with_date_time('non deprecated items occupation read')
     non_deprecated_items = get_all_non_deprecated_items()
     log_with_date_time('non deprecated items read')
