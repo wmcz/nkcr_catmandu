@@ -6,6 +6,7 @@ import pandas as pd
 import pywikibot
 from datetime import datetime
 
+import simplejson.errors
 from pywikibot.data import sparql
 
 import pywikibot_extension
@@ -147,7 +148,10 @@ def get_all_non_deprecated_items(limit:Union[int,None] = None) -> dict[dict[str,
         query = query + ' LIMIT ' + str(limit)
 
     query_object = sparql.SparqlQuery()
-    data_non_deprecated = query_object.select(query=query, full_data=True)
+    try:
+        data_non_deprecated = query_object.select(query=query, full_data=True)
+    except simplejson.errors.JSONDecodeError as e:
+        return non_deprecated_dictionary
 
     # non_deprecated_dictionary_cache = []
     item_non_deprecated: dict[str, Union[
@@ -205,6 +209,9 @@ def get_all_non_deprecated_items_occupation(limit:Union[int,None] = None, offset
 
     query_object = sparql.SparqlQuery()
     data_non_deprecated = query_object.select(query=query, full_data=True)
+
+    if type(data_non_deprecated) is None:
+        return non_deprecated_dictionary
 
     # non_deprecated_dictionary_cache = []
     item_non_deprecated: dict[str, Union[

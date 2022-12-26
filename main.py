@@ -103,10 +103,10 @@ if __name__ == '__main__':
     run = True
     fin = {}
     while run:
-        lim = 10000
+        lim = 100000
 
-        offset = i * 10000
-        if (i % 10 == 0):
+        offset = i * 100000
+        if (i % 3 == 0):
             print(offset)
         non_deprecated_items_occupation = get_all_non_deprecated_items_occupation(lim, offset)
         if (len(fin) == 0):
