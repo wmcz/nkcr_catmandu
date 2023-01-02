@@ -117,6 +117,7 @@ if __name__ == '__main__':
             run = False
         i = i + 1
 
+    non_deprecated_items_occupation = fin
     log_with_date_time('non deprecated items occupation read')
     non_deprecated_items = get_all_non_deprecated_items()
     log_with_date_time('non deprecated items read')

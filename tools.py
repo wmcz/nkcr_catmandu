@@ -140,7 +140,7 @@ def get_all_non_deprecated_items(limit:Union[int,None] = None) -> dict[dict[str,
         ?item p:P691 [ps:P691 ?nkcr ; wikibase:rank ?rank ] filter(?rank != wikibase:DeprecatedRank) .
         OPTIONAL{?item wdt:P213 ?isni}.
         OPTIONAL{?item wdt:P496 ?orcid}.
-        # VALUES ?nkcr {'jk01010030' 'mzk2004248910' 'xx0278251'}
+        #VALUES ?nkcr {'jcu20221169476' 'xx0279013' 'pna20221169479'}
     }
     """
 
@@ -200,7 +200,7 @@ def get_all_non_deprecated_items_occupation(limit:Union[int,None] = None, offset
     select ?item ?nkcr ?occup where {
         ?item p:P691 [ps:P691 ?nkcr ; wikibase:rank ?rank ] filter(?rank != wikibase:DeprecatedRank) .
         OPTIONAL{?item wdt:P106 ?occup}.
-          # VALUES ?nkcr {'jk01010030' 'mzk2004248910' 'xx0278251'} 
+         #VALUES ?nkcr {'jcu20221169476' 'xx0279013' 'pna20221169479'} 
         
     } LIMIT """ + str(limit) + """ OFFSET """ + str(offset) + """
     """
