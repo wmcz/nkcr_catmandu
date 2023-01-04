@@ -4,7 +4,7 @@ cd /home/frettie/nkcr_catmandu_pipeline;
 rm aut.xml.gz
 rm aut.xml
 echo "Run Catmandu"
-wget https://aleph.nkp.cz/data/aut.xml.gz
+wget -q https://aleph.nkp.cz/data/aut.xml.gz
 echo "Downloaded AUT XML GZ"
 gzip -df aut.xml.gz
 echo "Extracted AUT XML GZ"
