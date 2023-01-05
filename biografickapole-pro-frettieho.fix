@@ -9,7 +9,8 @@
 	  marc_map(046g,046g)    
 	  marc_map(370a,370a)
 	  marc_map(370b,370b)
-	  marc_map(370f,370f.$append,join:"$")  
+	  marc_map(370f,370f.$append,join:"$")
+	  marc_map(372a,372a.$append,join:"|")
 	  marc_map(374a,374a.$append,join:"|")  
 	  marc_map(375a,375a.$append,join:"|")  
 	  marc_map(377a,377a.$append,join:"$")  
@@ -29,6 +30,7 @@
 	end
 
 join_field(370f,'|')
+join_field(372a,'|')
 join_field(374a,'|')
 join_field(375a,'|')
 join_field(377a,'|')
