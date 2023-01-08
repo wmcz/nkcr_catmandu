@@ -14,7 +14,8 @@ from nkcr_exceptions import BadItemException
 from pywikibot_extension import MyDataSite
 from tools import write_log, print_info, add_new_field_to_item, get_nkcr_auts_from_item, make_qid_database, \
     get_all_non_deprecated_items, load_nkcr_items, get_claim_from_item_by_property, add_nkcr_aut_to_item, \
-    get_all_non_deprecated_items_occupation, get_occupations, is_item_subclass_of, log_with_date_time
+    get_all_non_deprecated_items_occupation, get_occupations, is_item_subclass_of, log_with_date_time, \
+    get_all_non_deprecated_items_field_of_work
 
 user_name = 'Frettiebot'
 debug = False
@@ -32,7 +33,7 @@ file_name = args.input
 
 # isni = P213
 # orcid = P496
-properties = {'0247a-isni': 'P213', '0247a-orcid': 'P496', '374a' : 'P106'}
+properties = {'0247a-isni': 'P213', '0247a-orcid': 'P496', '374a' : 'P106', '372a' : 'P101'}
 
 def process_new_fields(qid_new_fields: Union[str, None], wd_data: dict, row_new_fields: dict,
                        wd_item: Union[pywikibot.ItemPage, None] = None):
@@ -61,21 +62,43 @@ def process_new_fields(qid_new_fields: Union[str, None], wd_data: dict, row_new_
                                                                        property_for_new_field) # pro kontrolu
 
                 if type(row_new_fields[column]) is list:
-                    qid_claims_direct_from_wd = []
-                    class_occupation = pywikibot.ItemPage(repo, 'Q12737077')
-                    for cdfwd in claim_direct_from_wd:
-                        if type(cdfwd) is pywikibot.ItemPage:
-                            qid_claims_direct_from_wd.append(cdfwd.getID())
-                    for item_in_list in row_new_fields[column]:
-                        item_occupation = pywikibot.ItemPage(repo, item_in_list)
+                    if column == '374a':
+                        qid_claims_direct_from_wd = []
+                        class_occupation = pywikibot.ItemPage(repo, 'Q12737077')
+                        for cdfwd in claim_direct_from_wd:
+                            if type(cdfwd) is pywikibot.ItemPage:
+                                qid_claims_direct_from_wd.append(cdfwd.getID())
+                        for item_in_list in row_new_fields[column]:
+                            item_occupation = pywikibot.ItemPage(repo, item_in_list)
 
-                        if item_occupation.getID() not in qid_claims_direct_from_wd and item_occupation.getID() not in occupations_not_used_in_occupation_because_is_in_function:
-                            ocupp_qid = item_occupation.getID()
-                            if is_item_subclass_of(item_occupation, class_occupation):
-                                if row_new_fields[column] not in claim_direct_from_wd:
-                                    add_new_field_to_item(debug, repo, item_new_field, property_for_new_field,
-                                                          item_occupation,
-                                                          row_new_fields['_id'])
+                            if item_occupation.getID() not in qid_claims_direct_from_wd and item_occupation.getID() not in occupations_not_used_in_occupation_because_is_in_function:
+                                ocupp_qid = item_occupation.getID()
+                                if is_item_subclass_of(item_occupation, class_occupation):
+                                    if row_new_fields[column] not in claim_direct_from_wd:
+                                        add_new_field_to_item(debug, repo, item_new_field, property_for_new_field,
+                                                              item_occupation,
+                                                              row_new_fields['_id'])
+                    elif (column == '372a'):
+                        qid_claims_direct_from_wd = []
+                        for cdfwd in claim_direct_from_wd:
+                            if type(cdfwd) is pywikibot.ItemPage:
+                                qid_claims_direct_from_wd.append(cdfwd.getID())
+                        for item_in_list in row_new_fields[column]:
+                            item_occupation = pywikibot.ItemPage(repo, item_in_list)
+
+                            if item_occupation.getID() not in qid_claims_direct_from_wd:
+                                ocupp_qid = item_occupation.getID()
+                                occupations_direct_from_wd = get_claim_from_item_by_property(datas_from_wd,
+                                                                                       'P106')  # pro kontrolu
+                                qid_occupations_claims_direct_from_wd = []
+                                for odfwd in occupations_direct_from_wd:
+                                    if type(odfwd) is pywikibot.ItemPage:
+                                        qid_occupations_claims_direct_from_wd.append(odfwd.getID())
+                                if item_occupation.getID() not in qid_occupations_claims_direct_from_wd:
+                                    if row_new_fields[column] not in claim_direct_from_wd:
+                                        add_new_field_to_item(debug, repo, item_new_field, property_for_new_field,
+                                                              item_occupation,
+                                                              row_new_fields['_id'])
                 else:
                     if row_new_fields[column] not in claim_direct_from_wd:
                         add_new_field_to_item(debug, repo, item_new_field, property_for_new_field,
@@ -119,6 +142,28 @@ if __name__ == '__main__':
 
     non_deprecated_items_occupation = fin
     log_with_date_time('non deprecated items occupation read')
+
+    i = 0
+    run = True
+    fin_field = {}
+    while run:
+        lim = 100000
+
+        offset = i * 100000
+        if (i % 3 == 0):
+            print(offset)
+        non_deprecated_items_field_of_work = get_all_non_deprecated_items_field_of_work(lim, offset)
+        if (len(fin_field) == 0):
+            fin_field = non_deprecated_items_field_of_work
+        else:
+            fin_field.update(non_deprecated_items_field_of_work)
+        if (len(non_deprecated_items_field_of_work) == 0):
+            run = False
+        i = i + 1
+
+    non_deprecated_items_field_of_work = fin_field
+    log_with_date_time('non deprecated items field of work read')
+
     non_deprecated_items = get_all_non_deprecated_items()
     log_with_date_time('non deprecated items read')
     # non_deprecated_items = {}
@@ -209,6 +254,16 @@ if __name__ == '__main__':
                             item = item.getRedirectTarget()
                             item.get(get_redirect=True)
                         process_new_fields(None, non_deprecated_items_occupation[nkcr_aut], row, item)
+                if nkcr_aut in non_deprecated_items_field_of_work:
+                    exist_qid = non_deprecated_items_field_of_work[nkcr_aut]['qid']
+                    if exist_qid != '':
+                        exist_qid = clean_qid(exist_qid)
+                        process_new_fields(exist_qid, non_deprecated_items_field_of_work[nkcr_aut], row)
+                    if qid != '' and exist_qid != qid:
+                        if (item.isRedirectPage()):
+                            item = item.getRedirectTarget()
+                            item.get(get_redirect=True)
+                        process_new_fields(None, non_deprecated_items_field_of_work[nkcr_aut], row, item)
             except BadItemException as e:
                 log_with_date_time(str(e))
             except pywikibot.exceptions.NoPageError as e:
