@@ -69,7 +69,8 @@ def prepare_column_of_content(column, row):
     column_to_method_dictionary = {
         '0247a-isni': prepare_isni_from_nkcr,
         '0247a-orcid': prepare_orcid_from_nkcr,
-        '374a': prepare_occupation_from_nkcr
+        '374a': prepare_occupation_from_nkcr,
+        '372a': prepare_occupation_from_nkcr
     }
     return column_to_method_dictionary[column](row[column])
 
@@ -81,4 +82,6 @@ def resolve_exist_claims(column, wd_data):
         claims = wd_data['orcid']
     if column == '374a':
         claims = wd_data['occup']
+    if column == '372a':
+        claims = wd_data['field']
     return claims

@@ -116,6 +116,18 @@ def get_occupations():
     }
     """
 
+    # query = """
+    # select distinct ?item ?value ?string where {
+    #
+    #     ?item p:P691 ?s .
+    #     ?s wikibase:rank ?rank filter(?rank != wikibase:DeprecatedRank) .
+    #     ?s ps:P691 ?value .
+    #     ?s pq:P1810 ?string .
+    #     VALUES ?value {'ph121664' 'ph126519' 'ph114952'}
+    #
+    # }
+    # """
+
     query_object = sparql.SparqlQuery()
     data_occupation = query_object.select(query=query, full_data=True)
 
@@ -140,7 +152,7 @@ def get_all_non_deprecated_items(limit:Union[int,None] = None) -> dict[dict[str,
         ?item p:P691 [ps:P691 ?nkcr ; wikibase:rank ?rank ] filter(?rank != wikibase:DeprecatedRank) .
         OPTIONAL{?item wdt:P213 ?isni}.
         OPTIONAL{?item wdt:P496 ?orcid}.
-        #VALUES ?nkcr {'jcu20221169476' 'xx0279013' 'pna20221169479'}
+        # VALUES ?nkcr {'mzk20221172051' 'xx0279013' 'pna20221169479'}
     }
     """
 
@@ -200,7 +212,7 @@ def get_all_non_deprecated_items_occupation(limit:Union[int,None] = None, offset
     select ?item ?nkcr ?occup where {
         ?item p:P691 [ps:P691 ?nkcr ; wikibase:rank ?rank ] filter(?rank != wikibase:DeprecatedRank) .
         OPTIONAL{?item wdt:P106 ?occup}.
-         #VALUES ?nkcr {'jcu20221169476' 'xx0279013' 'pna20221169479'} 
+         # VALUES ?nkcr {'mzk20221172051' 'xx0279013' 'pna20221169479'} 
         
     } LIMIT """ + str(limit) + """ OFFSET """ + str(offset) + """
     """
@@ -240,6 +252,54 @@ def get_all_non_deprecated_items_occupation(limit:Union[int,None] = None, offset
     return non_deprecated_dictionary
 
 
+def get_all_non_deprecated_items_field_of_work(limit: Union[int, None] = None, offset: Union[int, None] = None) -> dict[
+    dict[str, list, list]]:
+    non_deprecated_dictionary: dict[dict[str, list, list]] = {}
+
+    query = """
+    select ?item ?nkcr ?field where {
+        ?item p:P691 [ps:P691 ?nkcr ; wikibase:rank ?rank ] filter(?rank != wikibase:DeprecatedRank) .
+        OPTIONAL{?item wdt:P101 ?field}.
+         # VALUES ?nkcr {'mzk20221172051' 'xx0279013' 'pna20221169479'} 
+
+    } LIMIT """ + str(limit) + """ OFFSET """ + str(offset) + """
+    """
+    # if (limit is not None):
+    #     query = query + ' LIMIT ' + str(limit)
+
+    query_object = sparql.SparqlQuery()
+    data_non_deprecated = query_object.select(query=query, full_data=True)
+
+    if type(data_non_deprecated) is None:
+        return non_deprecated_dictionary
+
+    # non_deprecated_dictionary_cache = []
+    item_non_deprecated: dict[str, Union[
+        pywikibot.data.sparql.URI, pywikibot.data.sparql.Literal, Union[pywikibot.data.sparql.Literal, None], Union[
+            pywikibot.data.sparql.Literal, None]]]
+    for item_non_deprecated in data_non_deprecated:
+        if item_non_deprecated['field'] is not None:
+            field_of_work = item_non_deprecated['field'].getID()
+        else:
+            field_of_work = None
+
+        if non_deprecated_dictionary.get(item_non_deprecated['nkcr'].value, None):
+            if field_of_work is not None:
+                non_deprecated_dictionary[item_non_deprecated['nkcr'].value]['field'].append(field_of_work)
+        else:
+            if field_of_work is not None:
+                field_of_work_add = [field_of_work]
+            else:
+                field_of_work_add = []
+
+            non_deprecated_dictionary[item_non_deprecated['nkcr'].value] = {
+                'qid': item_non_deprecated['item'].getID(),
+                'field': field_of_work_add,
+            }
+
+    return non_deprecated_dictionary
+
+
 def load_nkcr_items(file_name) -> pandas.DataFrame:
     data_csv = pd.read_csv(file_name, dtype={
         '_id': 'S',
@@ -252,6 +312,7 @@ def load_nkcr_items(file_name) -> pandas.DataFrame:
         '370a': 'S',
         '370b': 'S',
         '370f': 'S',
+        '372a': 'S',
         '374a': 'S',
         '375a': 'S',
         '377a': 'S',
