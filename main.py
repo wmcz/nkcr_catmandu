@@ -21,6 +21,7 @@ user_name = 'Frettiebot'
 debug = False
 count_first_step = 0
 count_second_step = 0
+limit = 50000
 
 occupations_not_used_in_occupation_because_is_in_function = ['Q103163', 'Q29182', 'Q611644', 'Q102039658', 'Q212071', 'Q22132694', 'Q63970319', 'Q11165895', 'Q83460']
 
@@ -126,9 +127,9 @@ if __name__ == '__main__':
     run = True
     fin = {}
     while run:
-        lim = 100000
+        lim = limit
 
-        offset = i * 100000
+        offset = i * limit
         if (i % 3 == 0):
             print(offset)
         non_deprecated_items_occupation = get_all_non_deprecated_items_occupation(lim, offset)
@@ -147,9 +148,9 @@ if __name__ == '__main__':
     run = True
     fin_field = {}
     while run:
-        lim = 100000
+        lim = limit
 
-        offset = i * 100000
+        offset = i * limit
         if (i % 3 == 0):
             print(offset)
         non_deprecated_items_field_of_work = get_all_non_deprecated_items_field_of_work(lim, offset)
