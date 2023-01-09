@@ -123,11 +123,11 @@ if __name__ == '__main__':
     repo = MyDataSite('wikidata', 'wikidata', user=user_name)
 
     log_with_date_time('run')
-    # non_deprecated_items_occupation = load_sparql_query_by_chunks(limit, get_all_non_deprecated_items_occupation)
-    # log_with_date_time('non deprecated items occupation read')
+    non_deprecated_items_occupation = load_sparql_query_by_chunks(limit, get_all_non_deprecated_items_occupation)
+    log_with_date_time('non deprecated items occupation read')
 
-    # non_deprecated_items_field_of_work = load_sparql_query_by_chunks(limit, get_all_non_deprecated_items_field_of_work)
-    # log_with_date_time('non deprecated items field of work read')
+    non_deprecated_items_field_of_work = load_sparql_query_by_chunks(limit, get_all_non_deprecated_items_field_of_work)
+    log_with_date_time('non deprecated items field of work read')
 
     non_deprecated_items = load_sparql_query_by_chunks(limit, get_all_non_deprecated_items)
     log_with_date_time('non deprecated items read')

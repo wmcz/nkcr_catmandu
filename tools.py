@@ -217,7 +217,11 @@ def get_all_non_deprecated_items_occupation(limit:Union[int,None] = None, offset
     #     query = query + ' LIMIT ' + str(limit)
 
     query_object = sparql.SparqlQuery()
-    data_non_deprecated = query_object.select(query=query, full_data=True)
+
+    try:
+        data_non_deprecated = query_object.select(query=query, full_data=True)
+    except simplejson.errors.JSONDecodeError as e:
+        return non_deprecated_dictionary
 
     if type(data_non_deprecated) is None:
         return non_deprecated_dictionary
@@ -265,7 +269,10 @@ def get_all_non_deprecated_items_field_of_work(limit: Union[int, None] = None, o
     #     query = query + ' LIMIT ' + str(limit)
 
     query_object = sparql.SparqlQuery()
-    data_non_deprecated = query_object.select(query=query, full_data=True)
+    try:
+        data_non_deprecated = query_object.select(query=query, full_data=True)
+    except simplejson.errors.JSONDecodeError as e:
+        return non_deprecated_dictionary
 
     if type(data_non_deprecated) is None:
         return non_deprecated_dictionary
