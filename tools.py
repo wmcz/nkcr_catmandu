@@ -127,11 +127,13 @@ def get_occupations():
     #
     # }
     # """
-
-    query_object = sparql.SparqlQuery()
-    data_occupation = query_object.select(query=query, full_data=True)
-
     occupation_dictionary: dict[dict[str, list, list]] = {}
+    query_object = sparql.SparqlQuery()
+
+    try:
+        data_occupation = query_object.select(query=query, full_data=True)
+    except simplejson.errors.JSONDecodeError as e:
+        return occupation_dictionary
 
     for item_occupation in data_occupation:
         if item_occupation['string'] is not None:
