@@ -15,7 +15,7 @@ from pywikibot_extension import MyDataSite
 from tools import write_log, print_info, add_new_field_to_item, get_nkcr_auts_from_item, make_qid_database, \
     get_all_non_deprecated_items, load_nkcr_items, get_claim_from_item_by_property, add_nkcr_aut_to_item, \
     get_all_non_deprecated_items_occupation, get_occupations, is_item_subclass_of, log_with_date_time, \
-    get_all_non_deprecated_items_field_of_work
+    get_all_non_deprecated_items_field_of_work, load_sparql_query_by_chunks
 
 user_name = 'Frettiebot'
 debug = False
@@ -123,49 +123,13 @@ if __name__ == '__main__':
     repo = MyDataSite('wikidata', 'wikidata', user=user_name)
 
     log_with_date_time('run')
-    i = 0
-    run = True
-    fin = {}
-    while run:
-        lim = limit
+    # non_deprecated_items_occupation = load_sparql_query_by_chunks(limit, get_all_non_deprecated_items_occupation)
+    # log_with_date_time('non deprecated items occupation read')
 
-        offset = i * limit
-        if (i % 3 == 0):
-            print(offset)
-        non_deprecated_items_occupation = get_all_non_deprecated_items_occupation(lim, offset)
-        if (len(fin) == 0):
-            fin = non_deprecated_items_occupation
-        else:
-            fin.update(non_deprecated_items_occupation)
-        if (len(non_deprecated_items_occupation) == 0):
-            run = False
-        i = i + 1
+    # non_deprecated_items_field_of_work = load_sparql_query_by_chunks(limit, get_all_non_deprecated_items_field_of_work)
+    # log_with_date_time('non deprecated items field of work read')
 
-    non_deprecated_items_occupation = fin
-    log_with_date_time('non deprecated items occupation read')
-
-    i = 0
-    run = True
-    fin_field = {}
-    while run:
-        lim = limit
-
-        offset = i * limit
-        if (i % 3 == 0):
-            print(offset)
-        non_deprecated_items_field_of_work = get_all_non_deprecated_items_field_of_work(lim, offset)
-        if (len(fin_field) == 0):
-            fin_field = non_deprecated_items_field_of_work
-        else:
-            fin_field.update(non_deprecated_items_field_of_work)
-        if (len(non_deprecated_items_field_of_work) == 0):
-            run = False
-        i = i + 1
-
-    non_deprecated_items_field_of_work = fin_field
-    log_with_date_time('non deprecated items field of work read')
-
-    non_deprecated_items = get_all_non_deprecated_items()
+    non_deprecated_items = load_sparql_query_by_chunks(limit, get_all_non_deprecated_items)
     log_with_date_time('non deprecated items read')
     # non_deprecated_items = {}
 

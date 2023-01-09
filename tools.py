@@ -144,7 +144,7 @@ def get_occupations():
 
     return occupation_dictionary
 
-def get_all_non_deprecated_items(limit:Union[int,None] = None) -> dict[dict[str, list, list]]:
+def get_all_non_deprecated_items(limit:Union[int,None] = None, offset:Union[int,None] = None) -> dict[dict[str, list, list]]:
     non_deprecated_dictionary: dict[dict[str, list, list]] = {}
 
     query = """
@@ -153,11 +153,8 @@ def get_all_non_deprecated_items(limit:Union[int,None] = None) -> dict[dict[str,
         OPTIONAL{?item wdt:P213 ?isni}.
         OPTIONAL{?item wdt:P496 ?orcid}.
         # VALUES ?nkcr {'mzk20221172051' 'xx0279013' 'pna20221169479'}
-    }
+    } LIMIT """ + str(limit) + """ OFFSET """ + str(offset) + """
     """
-
-    if (limit is not None):
-        query = query + ' LIMIT ' + str(limit)
 
     query_object = sparql.SparqlQuery()
     try:
@@ -355,3 +352,25 @@ def log_with_date_time(message:str = ''):
     datetime_object = datetime.now()
     formatted_time = datetime_object.strftime("%H:%M:%S")
     print(formatted_time + ": " + message)
+
+def load_sparql_query_by_chunks(limit, get_method):
+    i = 0
+    run = True
+    final_data = {}
+    while run:
+        lim = limit
+
+        offset = i * limit
+        if (i % 3 == 0):
+            log_with_date_time(get_method.__name__ + ": " + str(offset))
+        data = get_method(lim, offset)
+        if (len(final_data) == 0):
+            final_data = data
+        else:
+            final_data.update(data)
+        if (len(data) == 0):
+            run = False
+        i = i + 1
+
+    data = final_data
+    return data
