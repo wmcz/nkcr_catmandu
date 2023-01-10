@@ -1,10 +1,15 @@
 import csv
+import gc
 from typing import Union, Any
 
 import pandas
 import pandas as pd
 import pywikibot
 from datetime import datetime
+
+import rapidjson
+
+import mySparql
 
 import simplejson.errors
 from pywikibot.data import sparql
@@ -128,11 +133,14 @@ def get_occupations():
     # }
     # """
     occupation_dictionary: dict[dict[str, list, list]] = {}
-    query_object = sparql.SparqlQuery()
+    query_object = mySparql.MySparqlQuery()
+    # query_object = sparql.SparqlQuery()
 
     try:
         data_occupation = query_object.select(query=query, full_data=True)
     except simplejson.errors.JSONDecodeError as e:
+        return occupation_dictionary
+    except rapidjson.JSONDecodeError as e:
         return occupation_dictionary
 
     for item_occupation in data_occupation:
@@ -158,10 +166,13 @@ def get_all_non_deprecated_items(limit:Union[int,None] = None, offset:Union[int,
     } LIMIT """ + str(limit) + """ OFFSET """ + str(offset) + """
     """
 
-    query_object = sparql.SparqlQuery()
+    # query_object = sparql.SparqlQuery()
+    query_object = mySparql.MySparqlQuery()
     try:
         data_non_deprecated = query_object.select(query=query, full_data=True)
     except simplejson.errors.JSONDecodeError as e:
+        return non_deprecated_dictionary
+    except rapidjson.JSONDecodeError as e:
         return non_deprecated_dictionary
 
     # non_deprecated_dictionary_cache = []
@@ -201,7 +212,7 @@ def get_all_non_deprecated_items(limit:Union[int,None] = None, offset:Union[int,
                 'isni': isni_add,
                 'orcid': orcid_add,
             }
-
+    del (data_non_deprecated)
     return non_deprecated_dictionary
 
 def get_all_non_deprecated_items_occupation(limit:Union[int,None] = None, offset:Union[int,None] = None) -> dict[dict[str, list, list]]:
@@ -218,11 +229,14 @@ def get_all_non_deprecated_items_occupation(limit:Union[int,None] = None, offset
     # if (limit is not None):
     #     query = query + ' LIMIT ' + str(limit)
 
-    query_object = sparql.SparqlQuery()
+    # query_object = mySparql.MySparqlQuery()
+    query_object = mySparql.MySparqlQuery()
 
     try:
         data_non_deprecated = query_object.select(query=query, full_data=True)
     except simplejson.errors.JSONDecodeError as e:
+        return non_deprecated_dictionary
+    except rapidjson.JSONDecodeError as e:
         return non_deprecated_dictionary
 
     if type(data_non_deprecated) is None:
@@ -251,7 +265,8 @@ def get_all_non_deprecated_items_occupation(limit:Union[int,None] = None, offset
                 'qid': item_non_deprecated['item'].getID(),
                 'occup': occupation_add,
             }
-
+    del(data_non_deprecated)
+    del(query_object)
     return non_deprecated_dictionary
 
 
@@ -270,11 +285,15 @@ def get_all_non_deprecated_items_field_of_work(limit: Union[int, None] = None, o
     # if (limit is not None):
     #     query = query + ' LIMIT ' + str(limit)
 
-    query_object = sparql.SparqlQuery()
+    # query_object = sparql.SparqlQuery()
+    query_object = mySparql.MySparqlQuery()
     try:
         data_non_deprecated = query_object.select(query=query, full_data=True)
     except simplejson.errors.JSONDecodeError as e:
         return non_deprecated_dictionary
+    except rapidjson.JSONDecodeError as e:
+        return non_deprecated_dictionary
+
 
     if type(data_non_deprecated) is None:
         return non_deprecated_dictionary
@@ -302,7 +321,7 @@ def get_all_non_deprecated_items_field_of_work(limit: Union[int, None] = None, o
                 'qid': item_non_deprecated['item'].getID(),
                 'field': field_of_work_add,
             }
-
+    del (data_non_deprecated)
     return non_deprecated_dictionary
 
 
@@ -349,7 +368,8 @@ def is_item_subclass_of(item: pywikibot.ItemPage, subclass: pywikibot.ItemPage):
     }
     """
 
-    query_object = sparql.SparqlQuery()
+    # query_object = sparql.SparqlQuery()
+    query_object = mySparql.MySparqlQuery()
     data_is_subclass = query_object.select(query=query, full_data=False)
     if (len(data_is_subclass) == 0):
         # not subclass of
@@ -373,6 +393,7 @@ def load_sparql_query_by_chunks(limit, get_method):
         if (i % 3 == 0):
             log_with_date_time(get_method.__name__ + ": " + str(offset))
         data = get_method(lim, offset)
+        gc.collect()
         if (len(final_data) == 0):
             final_data = data
         else:

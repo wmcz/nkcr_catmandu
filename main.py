@@ -4,6 +4,8 @@ from typing import Union
 import pywikibot.data.sparql
 import requests
 
+import gc
+
 import time
 
 import cleaners
@@ -119,6 +121,7 @@ def process_new_fields(qid_new_fields: Union[str, None], wd_data: dict, row_new_
 
 if __name__ == '__main__':
     print_info(debug)
+    gc.enable()
 
     repo = MyDataSite('wikidata', 'wikidata', user=user_name)
 
