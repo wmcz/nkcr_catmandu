@@ -26,6 +26,7 @@ count_second_step = 0
 limit = 50000
 
 occupations_not_used_in_occupation_because_is_in_function = ['Q103163', 'Q29182', 'Q611644', 'Q102039658', 'Q212071', 'Q22132694', 'Q63970319', 'Q11165895', 'Q83460']
+fields_of_work_not_used_in_field_of_work_because_is_not_ok = ['Q11214']
 
 parser = argparse.ArgumentParser(description='NKČR catmandu pipeline.')
 parser.add_argument('-i', '--input', help='NKČR CSV file name', required=True)
@@ -89,7 +90,7 @@ def process_new_fields(qid_new_fields: Union[str, None], wd_data: dict, row_new_
                         for item_in_list in row_new_fields[column]:
                             item_occupation = pywikibot.ItemPage(repo, item_in_list)
 
-                            if item_occupation.getID() not in qid_claims_direct_from_wd:
+                            if item_occupation.getID() not in qid_claims_direct_from_wd and item_occupation.getID() not in fields_of_work_not_used_in_field_of_work_because_is_not_ok:
                                 ocupp_qid = item_occupation.getID()
                                 occupations_direct_from_wd = get_claim_from_item_by_property(datas_from_wd,
                                                                                        'P106')  # pro kontrolu
