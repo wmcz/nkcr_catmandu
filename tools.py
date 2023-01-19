@@ -116,7 +116,7 @@ def get_occupations():
 
         ?item p:P691 ?s .
         ?s wikibase:rank ?rank filter(?rank != wikibase:DeprecatedRank) .
-        ?s ps:P691 ?value filter(strstarts(str(?value),"ph")) .
+        ?s ps:P691 ?value filter(strstarts(str(?value),"ph") || strstarts(str(?value),"fd") ) .
         ?s pq:P1810 ?string .
     }
     """
