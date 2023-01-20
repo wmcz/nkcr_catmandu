@@ -15,7 +15,9 @@ import simplejson.errors
 from pywikibot.data import sparql
 
 import pywikibot_extension
-from cleaners import clean_last_comma
+from cleaners import clean_last_comma, clean_qid, resolve_exist_claims, prepare_column_of_content
+from config import properties, occupations_not_used_in_occupation_because_is_in_function, \
+    fields_of_work_not_used_in_field_of_work_because_is_not_ok
 
 
 def write_log(fields, create_file=False):
@@ -162,7 +164,7 @@ def get_all_non_deprecated_items(limit:Union[int,None] = None, offset:Union[int,
         ?item p:P691 [ps:P691 ?nkcr ; wikibase:rank ?rank ] filter(?rank != wikibase:DeprecatedRank) .
         OPTIONAL{?item wdt:P213 ?isni}.
         OPTIONAL{?item wdt:P496 ?orcid}.
-        # VALUES ?nkcr {'mzk20221172051' 'xx0279013' 'pna20221169479'}
+        # VALUES ?nkcr {'mzk20221172051' 'xx0279013' 'jo20231173439'}
     } LIMIT """ + str(limit) + """ OFFSET """ + str(offset) + """
     """
 
@@ -222,7 +224,7 @@ def get_all_non_deprecated_items_occupation(limit:Union[int,None] = None, offset
     select ?item ?nkcr ?occup where {
         ?item p:P691 [ps:P691 ?nkcr ; wikibase:rank ?rank ] filter(?rank != wikibase:DeprecatedRank) .
         OPTIONAL{?item wdt:P106 ?occup}.
-         # VALUES ?nkcr {'mzk20221172051' 'xx0279013' 'pna20221169479'} 
+        # VALUES ?nkcr {'mzk20221172051' 'xx0279013' 'jo20231173439'} 
         
     } LIMIT """ + str(limit) + """ OFFSET """ + str(offset) + """
     """
@@ -278,7 +280,7 @@ def get_all_non_deprecated_items_field_of_work(limit: Union[int, None] = None, o
     select ?item ?nkcr ?field where {
         ?item p:P691 [ps:P691 ?nkcr ; wikibase:rank ?rank ] filter(?rank != wikibase:DeprecatedRank) .
         OPTIONAL{?item wdt:P101 ?field}.
-         # VALUES ?nkcr {'mzk20221172051' 'xx0279013' 'pna20221169479'} 
+        # VALUES ?nkcr {'mzk20221172051' 'xx0279013' 'jo20231173439'} 
 
     } LIMIT """ + str(limit) + """ OFFSET """ + str(offset) + """
     """
@@ -404,3 +406,191 @@ def load_sparql_query_by_chunks(limit, get_method):
 
     data = final_data
     return data
+
+
+class Processor():
+
+    debug = False
+
+    def set_repo(self, repo):
+        self.repo = repo
+
+    def set_debug(self, debug):
+        self.debug = debug
+    def process_new_fields(self, qid_new_fields: Union[str, None], wd_data: dict, row_new_fields: dict,
+                           wd_item: Union[pywikibot.ItemPage, None] = None):
+        # print('process')
+        if wd_item is None:
+            item_new_field = pywikibot.ItemPage(self.repo, qid_new_fields)
+        else:
+            item_new_field = wd_item
+
+        for column, property_for_new_field in properties.items():
+            try:
+                # claims_in_new_item = datas_new_field['claims'].get(property_for_new_field, [])
+                claims = resolve_exist_claims(column, wd_data)
+
+                row_new_fields[column] = prepare_column_of_content(column, row_new_fields)
+                array_diff = []
+                if (type(row_new_fields[column]) is list):
+                    array_diff = set(row_new_fields[column]) - set(claims)
+                if (type(row_new_fields[column]) == str and row_new_fields[column] not in claims and len(
+                        row_new_fields[column]) > 0) or (type(row_new_fields[column] == list) and len(array_diff) > 0):
+                    # insert
+                    if (item_new_field.isRedirectPage()):
+                        item_new_field = item_new_field.getRedirectTarget()
+
+                    datas_from_wd = item_new_field.get(get_redirect=True)
+                    claim_direct_from_wd = get_claim_from_item_by_property(datas_from_wd,
+                                                                           property_for_new_field)  # pro kontrolu
+
+                    if type(row_new_fields[column]) is list:
+                        if column == '374a':
+                            propertyProcessor = PropertyProcessor374a()
+                            propertyProcessor.set_repo(self.repo)
+                            propertyProcessor.set_debug(self.debug)
+                            propertyProcessor.set_claim_direct_from_wd(claim_direct_from_wd)
+                            propertyProcessor.set_property_for_new_field(property_for_new_field)
+                            propertyProcessor.set_column(column)
+                            propertyProcessor.set_item_new_field(item_new_field)
+                            propertyProcessor.set_row_new_fields(row_new_fields)
+                            propertyProcessor.process()
+                        elif (column == '372a'):
+                            propertyProcessor = PropertyProcessor372a()
+                            propertyProcessor.set_repo(self.repo)
+                            propertyProcessor.set_debug(self.debug)
+                            propertyProcessor.set_claim_direct_from_wd(claim_direct_from_wd)
+                            propertyProcessor.set_property_for_new_field(property_for_new_field)
+                            propertyProcessor.set_column(column)
+                            propertyProcessor.set_item_new_field(item_new_field)
+                            propertyProcessor.set_row_new_fields(row_new_fields)
+
+                            propertyProcessor.set_datas_from_wd(datas_from_wd)
+
+                            propertyProcessor.process()
+                    else:
+                        propertyProcessor = PropertyProcessorOne()
+                        propertyProcessor.set_repo(self.repo)
+                        propertyProcessor.set_debug(self.debug)
+                        propertyProcessor.set_claim_direct_from_wd(claim_direct_from_wd)
+                        propertyProcessor.set_property_for_new_field(property_for_new_field)
+                        propertyProcessor.set_column(column)
+                        propertyProcessor.set_item_new_field(item_new_field)
+                        propertyProcessor.set_row_new_fields(row_new_fields)
+                        propertyProcessor.process()
+
+
+            except ValueError as ve:
+                log_with_date_time(str(ve))
+                pass
+            except pywikibot.exceptions.OtherPageSaveError as opse:
+                log_with_date_time(str(opse))
+                pass
+            except KeyError as ke:
+                # log_with_date_time(str(ke))
+                pass
+
+    def set_nkcr_aut(self, nkcr_aut):
+        self.nkcr_aut = nkcr_aut
+
+    def set_qid(self, qid):
+        self.qid = qid
+
+    def set_item(self, item):
+        self.item = item
+
+    def set_row(self, row):
+        self.row = row
+    def process_occupation_type(self, non_deprecated_items):
+
+        nkcr_aut = self.nkcr_aut
+        qid = self.qid
+        item = self.item
+        row = self.row
+
+        if nkcr_aut in non_deprecated_items:
+            exist_qid = non_deprecated_items[nkcr_aut]['qid']
+            if exist_qid != '':
+                exist_qid = clean_qid(exist_qid)
+                self.process_new_fields(exist_qid, non_deprecated_items[nkcr_aut], row)
+            if qid != '' and exist_qid != qid:
+                if (item.isRedirectPage()):
+                    item = item.getRedirectTarget()
+                    item.get(get_redirect=True)
+                self.process_new_fields(None, non_deprecated_items[nkcr_aut], row, item)
+
+
+class BasePropertyProcessor():
+    def set_claim_direct_from_wd(self, claim_direct_from_wd):
+        self.claim_direct_from_wd = claim_direct_from_wd
+
+    def set_repo(self, repo):
+        self.repo = repo
+
+    def set_row_new_fields(self, row_new_fields):
+        self.row_new_fields = row_new_fields
+
+    def set_column(self, column):
+        self.column = column
+
+    def set_debug(self, debug):
+        self.debug = debug
+
+    def set_item_new_field(self, item_new_field):
+        self.item_new_field = item_new_field
+
+    def set_property_for_new_field(self, property_for_new_field):
+        self.property_for_new_field = property_for_new_field
+class PropertyProcessor374a(BasePropertyProcessor):
+    def process(self):
+        qid_claims_direct_from_wd = []
+        class_occupation = pywikibot.ItemPage(self.repo, 'Q12737077')
+        claim_direct_from_wd = self.claim_direct_from_wd
+        for cdfwd in claim_direct_from_wd:
+            if type(cdfwd) is pywikibot.ItemPage:
+                qid_claims_direct_from_wd.append(cdfwd.getID())
+        for item_in_list in self.row_new_fields[self.column]:
+            item_occupation = pywikibot.ItemPage(self.repo, item_in_list)
+
+            if item_occupation.getID() not in qid_claims_direct_from_wd and item_occupation.getID() not in occupations_not_used_in_occupation_because_is_in_function:
+                ocupp_qid = item_occupation.getID()
+                if is_item_subclass_of(item_occupation, class_occupation):
+                    if self.row_new_fields[self.column] not in claim_direct_from_wd:
+                        add_new_field_to_item(self.debug, self.repo, self.item_new_field, self.property_for_new_field,
+                                              item_occupation,
+                                              self.row_new_fields['_id'])
+
+class PropertyProcessor372a(BasePropertyProcessor):
+
+    def set_datas_from_wd(self, datas_from_wd):
+        self.datas_from_wd = datas_from_wd
+
+    def process(self):
+        qid_claims_direct_from_wd = []
+        for cdfwd in self.claim_direct_from_wd:
+            if type(cdfwd) is pywikibot.ItemPage:
+                qid_claims_direct_from_wd.append(cdfwd.getID())
+        for item_in_list in self.row_new_fields[self.column]:
+            item_occupation = pywikibot.ItemPage(self.repo, item_in_list)
+
+            if item_occupation.getID() not in qid_claims_direct_from_wd and item_occupation.getID() not in fields_of_work_not_used_in_field_of_work_because_is_not_ok:
+                ocupp_qid = item_occupation.getID()
+                occupations_direct_from_wd = get_claim_from_item_by_property(self.datas_from_wd,
+                                                                             'P106')  # pro kontrolu
+                qid_occupations_claims_direct_from_wd = []
+                for odfwd in occupations_direct_from_wd:
+                    if type(odfwd) is pywikibot.ItemPage:
+                        qid_occupations_claims_direct_from_wd.append(odfwd.getID())
+                if item_occupation.getID() not in qid_occupations_claims_direct_from_wd:
+                    if self.row_new_fields[self.column] not in self.claim_direct_from_wd:
+                        add_new_field_to_item(self.debug, self.repo, self.item_new_field,
+                                              self.property_for_new_field,
+                                              item_occupation,
+                                              self.row_new_fields['_id'])
+
+class PropertyProcessorOne(BasePropertyProcessor):
+    def process(self):
+        if self.row_new_fields[self.column] not in self.claim_direct_from_wd:
+            add_new_field_to_item(self.debug, self.repo, self.item_new_field, self.property_for_new_field,
+                                  self.row_new_fields[self.column],
+                                  self.row_new_fields['_id'])
