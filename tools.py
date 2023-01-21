@@ -1,23 +1,17 @@
 import csv
 import gc
-from typing import Union, Any
+from datetime import datetime
 
 import pandas
 import pandas as pd
-import pywikibot
-from datetime import datetime
-
 import rapidjson
-
-import mySparql
-
 import simplejson.errors
 from pywikibot.data import sparql
 
+import mySparql
 import pywikibot_extension
-from cleaners import clean_last_comma, clean_qid, resolve_exist_claims, prepare_column_of_content
-from config import properties, occupations_not_used_in_occupation_because_is_in_function, \
-    fields_of_work_not_used_in_field_of_work_because_is_not_ok
+from cleaners import clean_last_comma
+from property_processor import *
 
 
 def write_log(fields, create_file=False):
@@ -29,12 +23,24 @@ def write_log(fields, create_file=False):
     writer.writerow(fields)
     csvfile.close()
 
+def reset_debug_file():
+    csvfile = open('debug.csv', 'w')
+    csvfile.close()
+
+def read_log() -> csv.DictReader:
+    csvfile = open('debug.csv', 'r')
+    reader = csv.DictReader(csvfile, fieldnames=['item', 'prop', 'value'])
+    return reader
+
+
 def print_info(debug):
     log_with_date_time('Catmandu processor for NKČR')
     if debug:
         log_with_date_time('DEBUG!!!')
 
-def add_new_field_to_item(debug: bool, repo: pywikibot_extension.MyDataSite, item_new_field: pywikibot.ItemPage, property_new_field: str, value: object,
+
+def add_new_field_to_item(debug: bool, repo: pywikibot_extension.MyDataSite, item_new_field: pywikibot.ItemPage,
+                          property_new_field: str, value: object,
                           nkcr_aut_new_field: str):
     sources = []
 
@@ -51,7 +57,7 @@ def add_new_field_to_item(debug: bool, repo: pywikibot_extension.MyDataSite, ite
     new_claim = pywikibot.Claim(repo, property_new_field)
     new_claim.setTarget(value)
     if debug:
-        if (type(value) is pywikibot.ItemPage):
+        if type(value) is pywikibot.ItemPage:
             value = value.getID()
         final = {'item': item_new_field.getID(), 'prop': property_new_field, 'value': value}
         write_log(final)
@@ -62,7 +68,9 @@ def add_new_field_to_item(debug: bool, repo: pywikibot_extension.MyDataSite, ite
         sources.append(source_date)
         new_claim.addSources(sources, tags=['Czech-Authorities-Sync'])
 
-def add_nkcr_aut_to_item(debug: bool, repo: pywikibot_extension.MyDataSite, item_to_add: pywikibot.ItemPage, nkcr_aut_to_add: str, name_to_add: str):
+
+def add_nkcr_aut_to_item(debug: bool, repo: pywikibot_extension.MyDataSite, item_to_add: pywikibot.ItemPage,
+                         nkcr_aut_to_add: str, name_to_add: str):
     sources = []
 
     source_nkcr = pywikibot.Claim(repo, 'P248')
@@ -93,7 +101,6 @@ def add_nkcr_aut_to_item(debug: bool, repo: pywikibot_extension.MyDataSite, item
         new_claim.addQualifier(qualifier, tags=['Czech-Authorities-Sync'])
 
 
-
 def get_nkcr_auts_from_item(datas) -> list:
     nkcr_auts_from_data = []
     claims_from_wd = datas['claims'].get('P691', [])
@@ -101,6 +108,7 @@ def get_nkcr_auts_from_item(datas) -> list:
         nkcr_auts_from_data.append(claim.getTarget())
 
     return nkcr_auts_from_data
+
 
 def make_qid_database(items: dict) -> dict[str, list[str]]:
     return_qids: dict[str, list[str]] = {}
@@ -112,7 +120,8 @@ def make_qid_database(items: dict) -> dict[str, list[str]]:
 
     return return_qids
 
-def get_occupations():
+
+def get_occupations() -> dict[dict[str, list, list]]:
     query = """
     select distinct ?item ?value ?string where {
 
@@ -140,9 +149,9 @@ def get_occupations():
 
     try:
         data_occupation = query_object.select(query=query, full_data=True)
-    except simplejson.errors.JSONDecodeError as e:
+    except simplejson.errors.JSONDecodeError:
         return occupation_dictionary
-    except rapidjson.JSONDecodeError as e:
+    except rapidjson.JSONDecodeError:
         return occupation_dictionary
 
     for item_occupation in data_occupation:
@@ -156,7 +165,9 @@ def get_occupations():
 
     return occupation_dictionary
 
-def get_all_non_deprecated_items(limit:Union[int,None] = None, offset:Union[int,None] = None) -> dict[dict[str, list, list]]:
+
+def get_all_non_deprecated_items(limit: Union[int, None] = None, offset: Union[int, None] = None) -> dict[
+    dict[str, list, list]]:
     non_deprecated_dictionary: dict[dict[str, list, list]] = {}
 
     query = """
@@ -172,9 +183,9 @@ def get_all_non_deprecated_items(limit:Union[int,None] = None, offset:Union[int,
     query_object = mySparql.MySparqlQuery()
     try:
         data_non_deprecated = query_object.select(query=query, full_data=True)
-    except simplejson.errors.JSONDecodeError as e:
+    except simplejson.errors.JSONDecodeError:
         return non_deprecated_dictionary
-    except rapidjson.JSONDecodeError as e:
+    except rapidjson.JSONDecodeError:
         return non_deprecated_dictionary
 
     # non_deprecated_dictionary_cache = []
@@ -214,10 +225,12 @@ def get_all_non_deprecated_items(limit:Union[int,None] = None, offset:Union[int,
                 'isni': isni_add,
                 'orcid': orcid_add,
             }
-    del (data_non_deprecated)
+    del data_non_deprecated
     return non_deprecated_dictionary
 
-def get_all_non_deprecated_items_occupation(limit:Union[int,None] = None, offset:Union[int,None] = None) -> dict[dict[str, list, list]]:
+
+def get_all_non_deprecated_items_occupation(limit: Union[int, None] = None, offset: Union[int, None] = None) -> dict[
+    dict[str, list, list]]:
     non_deprecated_dictionary: dict[dict[str, list, list]] = {}
 
     query = """
@@ -236,9 +249,9 @@ def get_all_non_deprecated_items_occupation(limit:Union[int,None] = None, offset
 
     try:
         data_non_deprecated = query_object.select(query=query, full_data=True)
-    except simplejson.errors.JSONDecodeError as e:
+    except simplejson.errors.JSONDecodeError:
         return non_deprecated_dictionary
-    except rapidjson.JSONDecodeError as e:
+    except rapidjson.JSONDecodeError:
         return non_deprecated_dictionary
 
     if type(data_non_deprecated) is None:
@@ -267,8 +280,8 @@ def get_all_non_deprecated_items_occupation(limit:Union[int,None] = None, offset
                 'qid': item_non_deprecated['item'].getID(),
                 'occup': occupation_add,
             }
-    del(data_non_deprecated)
-    del(query_object)
+    del data_non_deprecated
+    del query_object
     return non_deprecated_dictionary
 
 
@@ -291,11 +304,10 @@ def get_all_non_deprecated_items_field_of_work(limit: Union[int, None] = None, o
     query_object = mySparql.MySparqlQuery()
     try:
         data_non_deprecated = query_object.select(query=query, full_data=True)
-    except simplejson.errors.JSONDecodeError as e:
+    except simplejson.errors.JSONDecodeError:
         return non_deprecated_dictionary
-    except rapidjson.JSONDecodeError as e:
+    except rapidjson.JSONDecodeError:
         return non_deprecated_dictionary
-
 
     if type(data_non_deprecated) is None:
         return non_deprecated_dictionary
@@ -323,7 +335,7 @@ def get_all_non_deprecated_items_field_of_work(limit: Union[int, None] = None, o
                 'qid': item_non_deprecated['item'].getID(),
                 'field': field_of_work_add,
             }
-    del (data_non_deprecated)
+    del data_non_deprecated
     return non_deprecated_dictionary
 
 
@@ -354,13 +366,15 @@ def load_nkcr_items(file_name) -> pandas.DataFrame:
     # data_csv.fillna('', inplace=True)
     return data_csv
 
-def get_claim_from_item_by_property(datas: dict[str, Any], property: str) -> list:
+
+def get_claim_from_item_by_property(datas: dict[str, Any], property_of_item: str) -> list:
     claims_from_data = []
-    claims_by_property = datas['claims'].get(property, [])
+    claims_by_property = datas['claims'].get(property_of_item, [])
     for claim in claims_by_property:
         claims_from_data.append(claim.getTarget())
 
     return claims_from_data
+
 
 def is_item_subclass_of(item: pywikibot.ItemPage, subclass: pywikibot.ItemPage):
     query = """
@@ -370,21 +384,22 @@ def is_item_subclass_of(item: pywikibot.ItemPage, subclass: pywikibot.ItemPage):
     }
     """
 
-    # query_object = sparql.SparqlQuery()
     query_object = mySparql.MySparqlQuery()
     data_is_subclass = query_object.select(query=query, full_data=False)
-    if (len(data_is_subclass) == 0):
+    if len(data_is_subclass) == 0:
         # not subclass of
         return False
     else:
         return True
 
-def log_with_date_time(message:str = ''):
+
+def log_with_date_time(message: str = ''):
     datetime_object = datetime.now()
     formatted_time = datetime_object.strftime("%H:%M:%S")
     print(formatted_time + ": " + message)
 
-def load_sparql_query_by_chunks(limit, get_method):
+
+def load_sparql_query_by_chunks(limit: int, get_method):
     i = 0
     run = True
     final_data = {}
@@ -392,205 +407,17 @@ def load_sparql_query_by_chunks(limit, get_method):
         lim = limit
 
         offset = i * limit
-        if (i % 3 == 0):
+        if i % 3 == 0:
             log_with_date_time(get_method.__name__ + ": " + str(offset))
         data = get_method(lim, offset)
         gc.collect()
-        if (len(final_data) == 0):
+        if len(final_data) == 0:
             final_data = data
         else:
             final_data.update(data)
-        if (len(data) == 0):
+        if len(data) == 0:
             run = False
         i = i + 1
 
     data = final_data
     return data
-
-
-class Processor():
-
-    debug = False
-
-    def set_repo(self, repo):
-        self.repo = repo
-
-    def set_debug(self, debug):
-        self.debug = debug
-    def process_new_fields(self, qid_new_fields: Union[str, None], wd_data: dict, row_new_fields: dict,
-                           wd_item: Union[pywikibot.ItemPage, None] = None):
-        # print('process')
-        if wd_item is None:
-            item_new_field = pywikibot.ItemPage(self.repo, qid_new_fields)
-        else:
-            item_new_field = wd_item
-
-        for column, property_for_new_field in properties.items():
-            try:
-                # claims_in_new_item = datas_new_field['claims'].get(property_for_new_field, [])
-                claims = resolve_exist_claims(column, wd_data)
-
-                row_new_fields[column] = prepare_column_of_content(column, row_new_fields)
-                array_diff = []
-                if (type(row_new_fields[column]) is list):
-                    array_diff = set(row_new_fields[column]) - set(claims)
-                if (type(row_new_fields[column]) == str and row_new_fields[column] not in claims and len(
-                        row_new_fields[column]) > 0) or (type(row_new_fields[column] == list) and len(array_diff) > 0):
-                    # insert
-                    if (item_new_field.isRedirectPage()):
-                        item_new_field = item_new_field.getRedirectTarget()
-
-                    datas_from_wd = item_new_field.get(get_redirect=True)
-                    claim_direct_from_wd = get_claim_from_item_by_property(datas_from_wd,
-                                                                           property_for_new_field)  # pro kontrolu
-
-                    if type(row_new_fields[column]) is list:
-                        if column == '374a':
-                            propertyProcessor = PropertyProcessor374a()
-                            propertyProcessor.set_repo(self.repo)
-                            propertyProcessor.set_debug(self.debug)
-                            propertyProcessor.set_claim_direct_from_wd(claim_direct_from_wd)
-                            propertyProcessor.set_property_for_new_field(property_for_new_field)
-                            propertyProcessor.set_column(column)
-                            propertyProcessor.set_item_new_field(item_new_field)
-                            propertyProcessor.set_row_new_fields(row_new_fields)
-                            propertyProcessor.process()
-                        elif (column == '372a'):
-                            propertyProcessor = PropertyProcessor372a()
-                            propertyProcessor.set_repo(self.repo)
-                            propertyProcessor.set_debug(self.debug)
-                            propertyProcessor.set_claim_direct_from_wd(claim_direct_from_wd)
-                            propertyProcessor.set_property_for_new_field(property_for_new_field)
-                            propertyProcessor.set_column(column)
-                            propertyProcessor.set_item_new_field(item_new_field)
-                            propertyProcessor.set_row_new_fields(row_new_fields)
-
-                            propertyProcessor.set_datas_from_wd(datas_from_wd)
-
-                            propertyProcessor.process()
-                    else:
-                        propertyProcessor = PropertyProcessorOne()
-                        propertyProcessor.set_repo(self.repo)
-                        propertyProcessor.set_debug(self.debug)
-                        propertyProcessor.set_claim_direct_from_wd(claim_direct_from_wd)
-                        propertyProcessor.set_property_for_new_field(property_for_new_field)
-                        propertyProcessor.set_column(column)
-                        propertyProcessor.set_item_new_field(item_new_field)
-                        propertyProcessor.set_row_new_fields(row_new_fields)
-                        propertyProcessor.process()
-
-
-            except ValueError as ve:
-                log_with_date_time(str(ve))
-                pass
-            except pywikibot.exceptions.OtherPageSaveError as opse:
-                log_with_date_time(str(opse))
-                pass
-            except KeyError as ke:
-                # log_with_date_time(str(ke))
-                pass
-
-    def set_nkcr_aut(self, nkcr_aut):
-        self.nkcr_aut = nkcr_aut
-
-    def set_qid(self, qid):
-        self.qid = qid
-
-    def set_item(self, item):
-        self.item = item
-
-    def set_row(self, row):
-        self.row = row
-    def process_occupation_type(self, non_deprecated_items):
-
-        nkcr_aut = self.nkcr_aut
-        qid = self.qid
-        item = self.item
-        row = self.row
-
-        if nkcr_aut in non_deprecated_items:
-            exist_qid = non_deprecated_items[nkcr_aut]['qid']
-            if exist_qid != '':
-                exist_qid = clean_qid(exist_qid)
-                self.process_new_fields(exist_qid, non_deprecated_items[nkcr_aut], row)
-            if qid != '' and exist_qid != qid:
-                if (item.isRedirectPage()):
-                    item = item.getRedirectTarget()
-                    item.get(get_redirect=True)
-                self.process_new_fields(None, non_deprecated_items[nkcr_aut], row, item)
-
-
-class BasePropertyProcessor():
-    def set_claim_direct_from_wd(self, claim_direct_from_wd):
-        self.claim_direct_from_wd = claim_direct_from_wd
-
-    def set_repo(self, repo):
-        self.repo = repo
-
-    def set_row_new_fields(self, row_new_fields):
-        self.row_new_fields = row_new_fields
-
-    def set_column(self, column):
-        self.column = column
-
-    def set_debug(self, debug):
-        self.debug = debug
-
-    def set_item_new_field(self, item_new_field):
-        self.item_new_field = item_new_field
-
-    def set_property_for_new_field(self, property_for_new_field):
-        self.property_for_new_field = property_for_new_field
-class PropertyProcessor374a(BasePropertyProcessor):
-    def process(self):
-        qid_claims_direct_from_wd = []
-        class_occupation = pywikibot.ItemPage(self.repo, 'Q12737077')
-        claim_direct_from_wd = self.claim_direct_from_wd
-        for cdfwd in claim_direct_from_wd:
-            if type(cdfwd) is pywikibot.ItemPage:
-                qid_claims_direct_from_wd.append(cdfwd.getID())
-        for item_in_list in self.row_new_fields[self.column]:
-            item_occupation = pywikibot.ItemPage(self.repo, item_in_list)
-
-            if item_occupation.getID() not in qid_claims_direct_from_wd and item_occupation.getID() not in occupations_not_used_in_occupation_because_is_in_function:
-                ocupp_qid = item_occupation.getID()
-                if is_item_subclass_of(item_occupation, class_occupation):
-                    if self.row_new_fields[self.column] not in claim_direct_from_wd:
-                        add_new_field_to_item(self.debug, self.repo, self.item_new_field, self.property_for_new_field,
-                                              item_occupation,
-                                              self.row_new_fields['_id'])
-
-class PropertyProcessor372a(BasePropertyProcessor):
-
-    def set_datas_from_wd(self, datas_from_wd):
-        self.datas_from_wd = datas_from_wd
-
-    def process(self):
-        qid_claims_direct_from_wd = []
-        for cdfwd in self.claim_direct_from_wd:
-            if type(cdfwd) is pywikibot.ItemPage:
-                qid_claims_direct_from_wd.append(cdfwd.getID())
-        for item_in_list in self.row_new_fields[self.column]:
-            item_occupation = pywikibot.ItemPage(self.repo, item_in_list)
-
-            if item_occupation.getID() not in qid_claims_direct_from_wd and item_occupation.getID() not in fields_of_work_not_used_in_field_of_work_because_is_not_ok:
-                ocupp_qid = item_occupation.getID()
-                occupations_direct_from_wd = get_claim_from_item_by_property(self.datas_from_wd,
-                                                                             'P106')  # pro kontrolu
-                qid_occupations_claims_direct_from_wd = []
-                for odfwd in occupations_direct_from_wd:
-                    if type(odfwd) is pywikibot.ItemPage:
-                        qid_occupations_claims_direct_from_wd.append(odfwd.getID())
-                if item_occupation.getID() not in qid_occupations_claims_direct_from_wd:
-                    if self.row_new_fields[self.column] not in self.claim_direct_from_wd:
-                        add_new_field_to_item(self.debug, self.repo, self.item_new_field,
-                                              self.property_for_new_field,
-                                              item_occupation,
-                                              self.row_new_fields['_id'])
-
-class PropertyProcessorOne(BasePropertyProcessor):
-    def process(self):
-        if self.row_new_fields[self.column] not in self.claim_direct_from_wd:
-            add_new_field_to_item(self.debug, self.repo, self.item_new_field, self.property_for_new_field,
-                                  self.row_new_fields[self.column],
-                                  self.row_new_fields['_id'])

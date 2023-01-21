@@ -1,16 +1,18 @@
-from pywikibot.data.sparql import SparqlQuery, DEFAULT_HEADERS
-from urllib.parse import quote
-from typing import Optional
-from pywikibot.backports import Dict, List
-from requests.exceptions import Timeout
 from contextlib import suppress
+from typing import Optional
+from urllib.parse import quote
+
 import rapidjson
+from pywikibot.backports import Dict
 from pywikibot.comms import http
+from pywikibot.data.sparql import SparqlQuery, DEFAULT_HEADERS
+from requests.exceptions import Timeout
 
 try:
     from requests import JSONDecodeError
 except ImportError:  # requests < 2.27.0
     from json import JSONDecodeError
+
 
 class MySparqlQuery(SparqlQuery):
 
@@ -18,6 +20,7 @@ class MySparqlQuery(SparqlQuery):
         """
         Run SPARQL query and return parsed JSON result.
 
+        :param headers:
         :param query: Query text
         """
         if headers is None:

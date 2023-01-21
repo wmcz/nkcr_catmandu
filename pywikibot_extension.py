@@ -114,6 +114,7 @@ class MyDataSite(pywikibot.DataSite):
         """
         Create/Edit a qualifier.
 
+        :param new:
         :param tags:
         :param claim: A Claim object to add the qualifier to
         :type claim: pywikibot.Claim
@@ -147,4 +148,3 @@ class MyDataSite(pywikibot.DataSite):
 
         req = self._simple_request(**params)
         return req.submit()
-
