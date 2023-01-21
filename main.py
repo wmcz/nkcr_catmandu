@@ -1,20 +1,13 @@
 import argparse
-import datetime
-from typing import Union
-import pywikibot.data.sparql
-import requests
-
-import gc
-
 import time
 
-import cleaners
-from cleaners import clean_last_comma, clean_qid, \
-    prepare_column_of_content, resolve_exist_claims
+import requests
+
+from cleaners import clean_qid
 from config import *
 # from logger import Logger
 from nkcr_exceptions import BadItemException
-from pywikibot_extension import MyDataSite
+from processor import Processor
 from sources import Loader
 from tools import *
 
@@ -24,8 +17,6 @@ args = parser.parse_args()
 
 print("Input file: %s" % args.input)
 file_name = args.input
-
-
 
 
 if __name__ == '__main__':
@@ -55,7 +46,7 @@ if __name__ == '__main__':
 
             count = count + 1
 
-            if (count % 10000 == 0):
+            if count % 10000 == 0:
                 log_with_date_time('line: ' + str(count))
 
             if (count % 1000) == 0:
@@ -78,7 +69,7 @@ if __name__ == '__main__':
                             nkcr_auts_from_wd = get_nkcr_auts_from_item(datas)
                             if nkcr_aut not in nkcr_auts_from_wd:
                                 try:
-                                    if (item.isRedirectPage()):
+                                    if item.isRedirectPage():
                                         item = item.getRedirectTarget()
                                         item.get(get_redirect=True)
                                     add_nkcr_aut_to_item(debug, repo, item, nkcr_aut, name)
