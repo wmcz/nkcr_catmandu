@@ -39,6 +39,7 @@ def test_prepare_orcid_from_nkcr(orcid, result_orcid):
 def test_clean_last_comma(clean, result_clean):
     assert cleaners.clean_last_comma(clean) == result_clean
 
+
 @pytest.mark.parametrize(
     "isni,result_isni",
     [

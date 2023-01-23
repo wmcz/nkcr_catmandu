@@ -70,7 +70,7 @@ def prepare_isni_from_nkcr(isni: str) -> str:
         return ' '.join(str_chunks)
 
 
-def prepare_column_of_content(column, row):
+def prepare_column_of_content(column: str, row) -> Union[str, Union[str, list]]:
     column_to_method_dictionary = {
         '0247a-isni': prepare_isni_from_nkcr,
         '0247a-orcid': prepare_orcid_from_nkcr,
@@ -80,7 +80,7 @@ def prepare_column_of_content(column, row):
     return column_to_method_dictionary[column](row[column])
 
 
-def resolve_exist_claims(column, wd_data):
+def resolve_exist_claims(column: str, wd_data: dict) -> Union[str, list]:
     claims = []
     if column == '0247a-isni':
         claims = wd_data['isni']

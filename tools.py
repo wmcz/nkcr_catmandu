@@ -23,9 +23,11 @@ def write_log(fields, create_file=False):
     writer.writerow(fields)
     csvfile.close()
 
+
 def reset_debug_file():
     csvfile = open('debug.csv', 'w')
     csvfile.close()
+
 
 def read_log() -> csv.DictReader:
     csvfile = open('debug.csv', 'r')

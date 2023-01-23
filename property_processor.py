@@ -2,10 +2,9 @@ from typing import Union, Any
 
 import pywikibot
 
-from config import occupations_not_used_in_occupation_because_is_in_function, \
-    fields_of_work_not_used_in_field_of_work_because_is_not_ok
+from config import *
 from pywikibot_extension import MyDataSite
-from tools import is_item_subclass_of, add_new_field_to_item, get_claim_from_item_by_property
+from tools import *
 
 
 class BasePropertyProcessor:
@@ -56,7 +55,7 @@ class PropertyProcessor374a(BasePropertyProcessor):
         for item_in_list in self.row_new_fields[self.column]:
             item_occupation = pywikibot.ItemPage(self.repo, item_in_list)
 
-            if item_occupation.getID() not in qid_claims_direct_from_wd and item_occupation.getID() not in occupations_not_used_in_occupation_because_is_in_function:
+            if item_occupation.getID() not in qid_claims_direct_from_wd and item_occupation.getID() not in Config.occupations_not_used_in_occupation_because_is_in_function:
                 # ocupp_qid = item_occupation.getID()
                 if is_item_subclass_of(item_occupation, class_occupation):
                     if self.row_new_fields[self.column] not in self.claim_direct_from_wd:
@@ -79,10 +78,10 @@ class PropertyProcessor372a(BasePropertyProcessor):
         for item_in_list in self.row_new_fields[self.column]:
             item_occupation = pywikibot.ItemPage(self.repo, item_in_list)
 
-            if item_occupation.getID() not in qid_claims_direct_from_wd and item_occupation.getID() not in fields_of_work_not_used_in_field_of_work_because_is_not_ok:
+            if item_occupation.getID() not in qid_claims_direct_from_wd and item_occupation.getID() not in Config.fields_of_work_not_used_in_field_of_work_because_is_not_ok:
                 # ocupp_qid = item_occupation.getID()
                 occupations_direct_from_wd = get_claim_from_item_by_property(self.datas_from_wd,
-                                                                             'P106')  # pro kontrolu
+                                                                             Config.property_occupation)  # pro kontrolu
                 qid_occupations_claims_direct_from_wd = []
                 for odfwd in occupations_direct_from_wd:
                     if type(odfwd) is pywikibot.ItemPage:

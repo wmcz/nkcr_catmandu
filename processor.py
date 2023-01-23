@@ -1,8 +1,8 @@
 from cleaners import clean_qid, resolve_exist_claims, prepare_column_of_content
-from config import properties
+from config import *
 from property_processor import *
 from pywikibot_extension import MyDataSite
-from tools import log_with_date_time
+from tools import log_with_date_time, get_claim_from_item_by_property
 
 
 class Processor:
@@ -29,7 +29,7 @@ class Processor:
         else:
             item_new_field = wd_item
 
-        for column, property_for_new_field in properties.items():
+        for column, property_for_new_field in Config.properties.items():
             try:
                 # claims_in_new_item = datas_new_field['claims'].get(property_for_new_field, [])
                 claims = resolve_exist_claims(column, wd_data)

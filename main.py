@@ -20,14 +20,14 @@ file_name = args.input
 
 
 if __name__ == '__main__':
-    print_info(debug)
+    print_info(Config.debug)
     gc.enable()
 
-    repo = MyDataSite('wikidata', 'wikidata', user=user_name)
+    repo = MyDataSite('wikidata', 'wikidata', user=Config.user_name)
 
     processor = Processor()
     processor.set_repo(repo)
-    processor.set_debug(debug)
+    processor.set_debug(Config.debug)
 
     loader = Loader()
     loader.set_file_name(file_name)
@@ -72,7 +72,7 @@ if __name__ == '__main__':
                                     if item.isRedirectPage():
                                         item = item.getRedirectTarget()
                                         item.get(get_redirect=True)
-                                    add_nkcr_aut_to_item(debug, repo, item, nkcr_aut, name)
+                                    add_nkcr_aut_to_item(Config.debug, repo, item, nkcr_aut, name)
                                     loader.non_deprecated_items[nkcr_aut] = {
                                         'qid': qid,
                                         'isni': [],

@@ -2,7 +2,7 @@ import cleaners
 from tools import *
 
 
-class Loader():
+class Loader:
 
     limit: int = 50000
 

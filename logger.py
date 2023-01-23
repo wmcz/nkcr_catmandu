@@ -12,8 +12,8 @@ class Logger:
 
     def log(self, text, errorText = False, printLog = True):
 
-        if (self.logType == 'err'):
-            if (errorText):
+        if self.logType == 'err':
+            if errorText:
                 text = text + ';' + errorText
             self.logError(text)
         else:
@@ -24,7 +24,7 @@ class Logger:
             self.printLog()
 
     def printLog(self):
-        if (self.logType == 'err'):
+        if self.logType == 'err':
             splits = self.text.split(';')
             print('Error: ' + splits[1] + ' - ' + splits[0])
         else:
