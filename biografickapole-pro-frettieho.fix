@@ -1,10 +1,11 @@
-# catmandu convert MARC --type XML --fix data/biografickapole-pro-frettieho.fix to CSV --fields "_id,100a,100b,100d,100q,046f,046g,370a,370b,370f,374a,375a,377a,400ia,500ia7,678a,0247a-isni,0247a-wikidata,0247a,0247a-orcid" < data/aut.xml > data/output.csv
+# catmandu convert MARC --type XML --fix data/biografickapole-pro-frettieho.fix to CSV --fields "_id,100a,100b,100d,100q,151a,046f,046g,370a,370b,370f,374a,375a,377a,400ia,500ia7,678a,0247a-isni,0247a-wikidata,0247a,0247a-orcid" < data/aut.xml > data/output.csv
 
 	do marc_each()
 	  marc_map(100a,100a)
 	  marc_map(100b,100b)
 	  marc_map(100d,100d)  
 	  marc_map(100q,100q)
+	  marc_map(151a,151a)
 	  marc_map(046f,046f)
 	  marc_map(046g,046g)    
 	  marc_map(370a,370a)
