@@ -4,6 +4,7 @@ from datetime import datetime
 
 import pandas
 import pandas as pd
+import pywikibot
 import rapidjson
 import simplejson.errors
 from pywikibot.data import sparql
@@ -129,7 +130,7 @@ def get_occupations() -> dict[dict[str, list, list]]:
 
         ?item p:P691 ?s .
         ?s wikibase:rank ?rank filter(?rank != wikibase:DeprecatedRank) .
-        ?s ps:P691 ?value filter(strstarts(str(?value),"ph") || strstarts(str(?value),"fd") ) .
+        ?s ps:P691 ?value filter(strstarts(str(?value),"ph") || strstarts(str(?value),"fd") || strstarts(str(?value),"ge") ) .
         ?s pq:P1810 ?string .
     }
     """
@@ -336,6 +337,86 @@ def get_all_non_deprecated_items_field_of_work(limit: Union[int, None] = None, o
             non_deprecated_dictionary[item_non_deprecated['nkcr'].value] = {
                 'qid': item_non_deprecated['item'].getID(),
                 'field': field_of_work_add,
+            }
+    del data_non_deprecated
+    return non_deprecated_dictionary
+
+def get_all_non_deprecated_items_places(limit: Union[int, None] = None, offset: Union[int, None] = None) -> dict[
+    dict[str, list, list]]:
+    non_deprecated_dictionary: dict[dict[str, list, list]] = {}
+
+    query = """
+    select  ?item ?nkcr ?birth ?death ?work where {
+        ?item p:P691 [ps:P691 ?nkcr ; wikibase:rank ?rank ] filter(?rank != wikibase:DeprecatedRank) .
+        OPTIONAL{?item wdt:P19 ?birth}.
+        OPTIONAL{?item wdt:P20 ?death}.
+        OPTIONAL{?item wdt:P937 ?work}.
+        # VALUES ?nkcr {'ntk20221171270' 'jn20000701355' 'jn19990003840' 'zmp20221171377' 'av20221171362' 'xx0279716'}
+    }  LIMIT """ + str(limit) + """ OFFSET """ + str(offset) + """
+    """
+    # if (limit is not None):
+    #     query = query + ' LIMIT ' + str(limit)
+
+    # query_object = sparql.SparqlQuery()
+    query_object = mySparql.MySparqlQuery()
+    try:
+        data_non_deprecated = query_object.select(query=query, full_data=True)
+    except simplejson.errors.JSONDecodeError:
+        return non_deprecated_dictionary
+    except rapidjson.JSONDecodeError:
+        return non_deprecated_dictionary
+
+    if type(data_non_deprecated) is None:
+        return non_deprecated_dictionary
+
+    # non_deprecated_dictionary_cache = []
+    item_non_deprecated: dict[str, Union[
+        pywikibot.data.sparql.URI, pywikibot.data.sparql.Literal, Union[pywikibot.data.sparql.Literal, None], Union[
+            pywikibot.data.sparql.Literal, None]]]
+    for item_non_deprecated in data_non_deprecated:
+        if item_non_deprecated['birth'] is not None:
+            birth = item_non_deprecated['birth'].getID()
+        else:
+            birth = None
+
+        if item_non_deprecated['death'] is not None:
+            death = item_non_deprecated['death'].getID()
+        else:
+            death = None
+
+        if item_non_deprecated['work'] is not None:
+            work = item_non_deprecated['work'].getID()
+        else:
+            work = None
+
+        if non_deprecated_dictionary.get(item_non_deprecated['nkcr'].value, None):
+            if birth is not None:
+                non_deprecated_dictionary[item_non_deprecated['nkcr'].value]['birth'].append(birth)
+            if death is not None:
+                non_deprecated_dictionary[item_non_deprecated['nkcr'].value]['death'].append(death)
+            if work is not None:
+                non_deprecated_dictionary[item_non_deprecated['nkcr'].value]['work'].append(work)
+        else:
+            if birth is not None:
+                birth_add = [birth]
+            else:
+                birth_add = []
+
+            if death is not None:
+                death_add = [death]
+            else:
+                death_add = []
+
+            if work is not None:
+                work_add = [work]
+            else:
+                work_add = []
+
+            non_deprecated_dictionary[item_non_deprecated['nkcr'].value] = {
+                'qid': item_non_deprecated['item'].getID(),
+                'birth': birth_add,
+                'death': death_add,
+                'work': work_add,
             }
     del data_non_deprecated
     return non_deprecated_dictionary

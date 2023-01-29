@@ -8,14 +8,14 @@ from tools import *
 
 
 class BasePropertyProcessor:
-    def __init__(self):
-        self.property_for_new_field: Union[str, None] = None
-        self.item_new_field: Union[pywikibot.ItemPage, None] = None
-        self.debug: bool = False
-        self.column: Union[str, None] = None
-        self.row_new_fields: dict = {}
-        self.repo: Union[MyDataSite, None] = None
-        self.claim_direct_from_wd = None
+    def __init__(self, repo, debug, column, row_new_fields, claim_direct_from_wd, property_for_new_field, item_new_field):
+        self.property_for_new_field: Union[str, None] = property_for_new_field
+        self.item_new_field: Union[pywikibot.ItemPage, None] = item_new_field
+        self.debug: bool = debug
+        self.column: Union[str, None] = column
+        self.row_new_fields: dict = row_new_fields
+        self.repo: Union[MyDataSite, None] = repo
+        self.claim_direct_from_wd = claim_direct_from_wd
 
     def set_claim_direct_from_wd(self, claim_direct_from_wd):
         self.claim_direct_from_wd = claim_direct_from_wd
@@ -63,12 +63,46 @@ class PropertyProcessor374a(BasePropertyProcessor):
                                               item_occupation,
                                               self.row_new_fields['_id'])
 
+class PropertyProcessor370a(BasePropertyProcessor):
+
+    def process(self):
+        qid_claims_direct_from_wd = self.get_qid_claims_direct_from_wd()
+        for item_in_list in self.row_new_fields[self.column]:
+            item_place = pywikibot.ItemPage(self.repo, item_in_list)
+
+            if item_place.getID() not in qid_claims_direct_from_wd:
+                if self.row_new_fields[self.column] not in self.claim_direct_from_wd:
+                    add_new_field_to_item(self.debug, self.repo, self.item_new_field, self.property_for_new_field,
+                                          item_place,
+                                          self.row_new_fields['_id'])
+
+class PropertyProcessor370b(BasePropertyProcessor):
+
+    def process(self):
+        qid_claims_direct_from_wd = self.get_qid_claims_direct_from_wd()
+        for item_in_list in self.row_new_fields[self.column]:
+            item_place = pywikibot.ItemPage(self.repo, item_in_list)
+
+            if item_place.getID() not in qid_claims_direct_from_wd:
+                if self.row_new_fields[self.column] not in self.claim_direct_from_wd:
+                    add_new_field_to_item(self.debug, self.repo, self.item_new_field, self.property_for_new_field,
+                                          item_place,
+                                          self.row_new_fields['_id'])
+
+class PropertyProcessor370f(BasePropertyProcessor):
+
+    def process(self):
+        qid_claims_direct_from_wd = self.get_qid_claims_direct_from_wd()
+        for item_in_list in self.row_new_fields[self.column]:
+            item_place = pywikibot.ItemPage(self.repo, item_in_list)
+
+            if item_place.getID() not in qid_claims_direct_from_wd:
+                if self.row_new_fields[self.column] not in self.claim_direct_from_wd:
+                    add_new_field_to_item(self.debug, self.repo, self.item_new_field, self.property_for_new_field,
+                                          item_place,
+                                          self.row_new_fields['_id'])
 
 class PropertyProcessor372a(BasePropertyProcessor):
-
-    def __init__(self):
-        super().__init__()
-        self.datas_from_wd: Union[dict[str, Any], None] = None
 
     def set_datas_from_wd(self, datas_from_wd: dict[str, Any]):
         self.datas_from_wd = datas_from_wd

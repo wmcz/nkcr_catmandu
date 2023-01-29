@@ -13,6 +13,7 @@ class Loader:
         self.non_deprecated_items_occupation: dict = {}
         self.non_deprecated_items: dict = {}
         self.non_deprecated_items_field_of_work: dict = {}
+        self.non_deprecated_items_places: dict = {}
         self.file_name: str = ''
 
     def set_limit(self, limit: int):
@@ -23,6 +24,10 @@ class Loader:
 
     def load(self):
         log_with_date_time('run')
+
+        self.non_deprecated_items_places = load_sparql_query_by_chunks(self.limit, get_all_non_deprecated_items_places)
+        log_with_date_time('non deprecated items places read')
+
         self.non_deprecated_items_occupation = load_sparql_query_by_chunks(self.limit, get_all_non_deprecated_items_occupation)
         log_with_date_time('non deprecated items occupation read')
 

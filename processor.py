@@ -50,37 +50,24 @@ class Processor:
 
                     if type(row_new_fields[column]) is list:
                         if column == '374a':
-                            property_processor = PropertyProcessor374a()
-                            property_processor.set_repo(self.repo)
-                            property_processor.set_debug(self.debug)
-                            property_processor.set_claim_direct_from_wd(claim_direct_from_wd)
-                            property_processor.set_property_for_new_field(property_for_new_field)
-                            property_processor.set_column(column)
-                            property_processor.set_item_new_field(item_new_field)
-                            property_processor.set_row_new_fields(row_new_fields)
+                            property_processor = PropertyProcessor374a(repo=self.repo, debug=self.debug, property_for_new_field=property_for_new_field, column=column, row_new_fields=row_new_fields, claim_direct_from_wd=claim_direct_from_wd, item_new_field=item_new_field)
                             property_processor.process()
                         elif column == '372a':
-                            property_processor = PropertyProcessor372a()
-                            property_processor.set_repo(self.repo)
-                            property_processor.set_debug(self.debug)
-                            property_processor.set_claim_direct_from_wd(claim_direct_from_wd)
-                            property_processor.set_property_for_new_field(property_for_new_field)
-                            property_processor.set_column(column)
-                            property_processor.set_item_new_field(item_new_field)
-                            property_processor.set_row_new_fields(row_new_fields)
-
+                            property_processor = PropertyProcessor372a(repo=self.repo, debug=self.debug, property_for_new_field=property_for_new_field, column=column, row_new_fields=row_new_fields, claim_direct_from_wd=claim_direct_from_wd, item_new_field=item_new_field)
                             property_processor.set_datas_from_wd(datas_from_wd)
 
                             property_processor.process()
+                        elif column == '370a':
+                            property_processor = PropertyProcessor370a(repo=self.repo, debug=self.debug, property_for_new_field=property_for_new_field, column=column, row_new_fields=row_new_fields, claim_direct_from_wd=claim_direct_from_wd, item_new_field=item_new_field)
+                            property_processor.process()
+                        elif column == '370b':
+                            property_processor = PropertyProcessor370b(repo=self.repo, debug=self.debug, property_for_new_field=property_for_new_field, column=column, row_new_fields=row_new_fields, claim_direct_from_wd=claim_direct_from_wd, item_new_field=item_new_field)
+                            property_processor.process()
+                        elif column == '370f':
+                            property_processor = PropertyProcessor370f(repo=self.repo, debug=self.debug, property_for_new_field=property_for_new_field, column=column, row_new_fields=row_new_fields, claim_direct_from_wd=claim_direct_from_wd, item_new_field=item_new_field)
+                            property_processor.process()
                     else:
-                        property_processor = PropertyProcessorOne()
-                        property_processor.set_repo(self.repo)
-                        property_processor.set_debug(self.debug)
-                        property_processor.set_claim_direct_from_wd(claim_direct_from_wd)
-                        property_processor.set_property_for_new_field(property_for_new_field)
-                        property_processor.set_column(column)
-                        property_processor.set_item_new_field(item_new_field)
-                        property_processor.set_row_new_fields(row_new_fields)
+                        property_processor = PropertyProcessorOne(repo=self.repo, debug=self.debug, property_for_new_field=property_for_new_field, column=column, row_new_fields=row_new_fields, claim_direct_from_wd=claim_direct_from_wd, item_new_field=item_new_field)
                         property_processor.process()
 
             except ValueError as ve:

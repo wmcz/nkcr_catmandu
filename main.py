@@ -97,6 +97,7 @@ if __name__ == '__main__':
                 processor.process_occupation_type(loader.non_deprecated_items)
                 processor.process_occupation_type(loader.non_deprecated_items_occupation)
                 processor.process_occupation_type(loader.non_deprecated_items_field_of_work)
+                processor.process_occupation_type(loader.non_deprecated_items_places)
             except BadItemException as e:
                 log_with_date_time(str(e))
             except pywikibot.exceptions.NoPageError as e:
