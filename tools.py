@@ -288,14 +288,15 @@ def get_all_non_deprecated_items_occupation(limit: Union[int, None] = None, offs
     return non_deprecated_dictionary
 
 
-def get_all_non_deprecated_items_field_of_work(limit: Union[int, None] = None, offset: Union[int, None] = None) -> dict[
+def get_all_non_deprecated_items_field_of_work_and_occupation(limit: Union[int, None] = None, offset: Union[int, None] = None) -> dict[
     dict[str, list, list]]:
     non_deprecated_dictionary: dict[dict[str, list, list]] = {}
 
     query = """
-    select ?item ?nkcr ?field where {
+    select ?item ?nkcr ?field ?occup where {
         ?item p:P691 [ps:P691 ?nkcr ; wikibase:rank ?rank ] filter(?rank != wikibase:DeprecatedRank) .
         OPTIONAL{?item wdt:P101 ?field}.
+        OPTIONAL{?item wdt:P106 ?occup}.
         # VALUES ?nkcr {'mzk20221172051' 'xx0279013' 'jo20231173439'} 
 
     } LIMIT """ + str(limit) + """ OFFSET """ + str(offset) + """
@@ -325,18 +326,32 @@ def get_all_non_deprecated_items_field_of_work(limit: Union[int, None] = None, o
         else:
             field_of_work = None
 
+        if item_non_deprecated['occup'] is not None:
+            occupation = item_non_deprecated['occup'].getID()
+        else:
+            occupation = None
+
         if non_deprecated_dictionary.get(item_non_deprecated['nkcr'].value, None):
             if field_of_work is not None:
                 non_deprecated_dictionary[item_non_deprecated['nkcr'].value]['field'].append(field_of_work)
+
+            if occupation is not None:
+                non_deprecated_dictionary[item_non_deprecated['nkcr'].value]['occup'].append(occupation)
         else:
             if field_of_work is not None:
                 field_of_work_add = [field_of_work]
             else:
                 field_of_work_add = []
 
+            if occupation is not None:
+                occupation_add = [occupation]
+            else:
+                occupation_add = []
+
             non_deprecated_dictionary[item_non_deprecated['nkcr'].value] = {
                 'qid': item_non_deprecated['item'].getID(),
                 'field': field_of_work_add,
+                'occup': occupation_add,
             }
     del data_non_deprecated
     return non_deprecated_dictionary
