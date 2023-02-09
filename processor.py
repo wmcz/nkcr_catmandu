@@ -14,6 +14,7 @@ class Processor:
         self.qid = None
         self.nkcr_aut = None
         self.repo: Union[MyDataSite, None] = None
+        self.enabled_columns: dict = {}
 
     def set_repo(self, repo: MyDataSite):
         self.repo = repo
@@ -29,7 +30,12 @@ class Processor:
         else:
             item_new_field = wd_item
 
-        for column, property_for_new_field in Config.properties.items():
+        if len(self.enabled_columns) > 0:
+            property_dict_for_this_processor = self.enabled_columns
+        else:
+            properties_dict_for_this_processor = Config.properties
+
+        for column, property_for_new_field in property_dict_for_this_processor.items():
             try:
                 # claims_in_new_item = datas_new_field['claims'].get(property_for_new_field, [])
                 claims = resolve_exist_claims(column, wd_data)
@@ -66,6 +72,13 @@ class Processor:
                         elif column == '370f':
                             property_processor = PropertyProcessor370f(repo=self.repo, debug=self.debug, property_for_new_field=property_for_new_field, column=column, row_new_fields=row_new_fields, claim_direct_from_wd=claim_direct_from_wd, item_new_field=item_new_field)
                             property_processor.process()
+                        elif column == '377a':
+                            property_processor = PropertyProcessor377a(repo=self.repo, debug=self.debug,
+                                                                       property_for_new_field=property_for_new_field,
+                                                                       column=column, row_new_fields=row_new_fields,
+                                                                       claim_direct_from_wd=claim_direct_from_wd,
+                                                                       item_new_field=item_new_field)
+                            property_processor.process()
                     else:
                         property_processor = PropertyProcessorOne(repo=self.repo, debug=self.debug, property_for_new_field=property_for_new_field, column=column, row_new_fields=row_new_fields, claim_direct_from_wd=claim_direct_from_wd, item_new_field=item_new_field)
                         property_processor.process()
@@ -91,6 +104,9 @@ class Processor:
 
     def set_row(self, row):
         self.row = row
+
+    def set_enabled_columns(self, columns: dict):
+        self.enabled_columns = columns
 
     def process_occupation_type(self, non_deprecated_items):
 

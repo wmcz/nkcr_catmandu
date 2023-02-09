@@ -8,6 +8,7 @@ from config import *
 # from logger import Logger
 from nkcr_exceptions import BadItemException
 from processor import Processor
+from pywikibot_extension import MyDataSite
 from sources import Loader
 from tools import *
 
@@ -94,9 +95,32 @@ if __name__ == '__main__':
                     processor.set_item(None)
                 processor.set_row(row)
 
+                properties = {
+                    '0247a-isni': 'P213',
+                    '0247a-orcid': 'P496',
+                }
+                processor.set_enabled_columns(properties)
                 processor.process_occupation_type(loader.non_deprecated_items)
+
+                properties = {
+                    '374a': 'P106',
+                    '372a': 'P101',
+                }
+                processor.set_enabled_columns(properties)
                 processor.process_occupation_type(loader.non_deprecated_items_field_of_work_and_occupation)
-                # processor.process_occupation_type(loader.non_deprecated_items_field_of_work_and_occupation)
+
+                properties = {
+                    '377a': 'P1412',
+                }
+                processor.set_enabled_columns(properties)
+                processor.process_occupation_type(loader.non_deprecated_items_languages)
+
+                properties = {
+                    '370a': 'P19',
+                    '370b': 'P20',
+                    '370f': 'P937',
+                }
+                processor.set_enabled_columns(properties)
                 processor.process_occupation_type(loader.non_deprecated_items_places)
             except BadItemException as e:
                 log_with_date_time(str(e))

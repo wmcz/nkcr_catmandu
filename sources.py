@@ -15,6 +15,8 @@ class Loader:
         self.non_deprecated_items_field_of_work: dict = {}
         self.non_deprecated_items_field_of_work_and_occupation: dict = {}
         self.non_deprecated_items_places: dict = {}
+        self.non_deprecated_items_languages: dict = {}
+        self.languages_dict: dict[str, str] = {}
         self.file_name: str = ''
 
     def set_limit(self, limit: int):
@@ -25,6 +27,12 @@ class Loader:
 
     def load(self):
         log_with_date_time('run')
+
+        self.languages_dict = load_language_dict_csv()
+        log_with_date_time('loaded language dict from github')
+
+        self.non_deprecated_items_languages = load_sparql_query_by_chunks(self.limit, get_all_non_deprecated_items_languages)
+        log_with_date_time('non deprecated items languages used read')
 
         self.non_deprecated_items_field_of_work_and_occupation = load_sparql_query_by_chunks(self.limit,
                                                                                              get_all_non_deprecated_items_field_of_work_and_occupation)
@@ -42,5 +50,6 @@ class Loader:
         self.qid_to_nkcr = make_qid_database(self.non_deprecated_items)
         log_with_date_time('qid_to_nkcr read')
         cleaners.name_to_nkcr = self.name_to_nkcr
+        cleaners.language_dict = self.languages_dict
         self.chunks = load_nkcr_items(self.file_name)
         log_with_date_time('nkcr csv read')
