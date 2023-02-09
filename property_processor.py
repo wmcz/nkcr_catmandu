@@ -134,3 +134,16 @@ class PropertyProcessorOne(BasePropertyProcessor):
             add_new_field_to_item(self.debug, self.repo, self.item_new_field, self.property_for_new_field,
                                   self.row_new_fields[self.column],
                                   self.row_new_fields['_id'])
+
+class PropertyProcessor377a(BasePropertyProcessor):
+
+    def process(self):
+        qid_claims_direct_from_wd = self.get_qid_claims_direct_from_wd()
+        for item_in_list in self.row_new_fields[self.column]:
+            item_language = pywikibot.ItemPage(self.repo, item_in_list)
+
+            if item_language.getID() not in qid_claims_direct_from_wd:
+                if self.row_new_fields[self.column] not in self.claim_direct_from_wd:
+                    add_new_field_to_item(self.debug, self.repo, self.item_new_field, self.property_for_new_field,
+                                          item_language,
+                                          self.row_new_fields['_id'])

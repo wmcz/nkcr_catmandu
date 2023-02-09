@@ -6,6 +6,7 @@ import pandas
 import pandas as pd
 import pywikibot
 import rapidjson
+import requests
 import simplejson.errors
 from pywikibot.data import sparql
 
@@ -13,7 +14,7 @@ import mySparql
 import pywikibot_extension
 from cleaners import clean_last_comma
 from property_processor import *
-
+from os.path import exists
 
 def write_log(fields, create_file=False):
     if create_file:
@@ -178,7 +179,7 @@ def get_all_non_deprecated_items(limit: Union[int, None] = None, offset: Union[i
         ?item p:P691 [ps:P691 ?nkcr ; wikibase:rank ?rank ] filter(?rank != wikibase:DeprecatedRank) .
         OPTIONAL{?item wdt:P213 ?isni}.
         OPTIONAL{?item wdt:P496 ?orcid}.
-        # VALUES ?nkcr {'mzk20221172051' 'xx0279013' 'jo20231173439'}
+        # VALUES ?nkcr {'ntk20221171270' 'xx0279013' 'jo20231173439'}
     } LIMIT """ + str(limit) + """ OFFSET """ + str(offset) + """
     """
 
@@ -240,7 +241,7 @@ def get_all_non_deprecated_items_occupation(limit: Union[int, None] = None, offs
     select ?item ?nkcr ?occup where {
         ?item p:P691 [ps:P691 ?nkcr ; wikibase:rank ?rank ] filter(?rank != wikibase:DeprecatedRank) .
         OPTIONAL{?item wdt:P106 ?occup}.
-        # VALUES ?nkcr {'mzk20221172051' 'xx0279013' 'jo20231173439'} 
+        # VALUES ?nkcr {'ntk20221171270' 'xx0279013' 'jo20231173439'} 
         
     } LIMIT """ + str(limit) + """ OFFSET """ + str(offset) + """
     """
@@ -297,7 +298,7 @@ def get_all_non_deprecated_items_field_of_work_and_occupation(limit: Union[int, 
         ?item p:P691 [ps:P691 ?nkcr ; wikibase:rank ?rank ] filter(?rank != wikibase:DeprecatedRank) .
         OPTIONAL{?item wdt:P101 ?field}.
         OPTIONAL{?item wdt:P106 ?occup}.
-        # VALUES ?nkcr {'mzk20221172051' 'xx0279013' 'jo20231173439'} 
+        # VALUES ?nkcr {'ntk20221171270' 'xx0279013' 'jo20231173439'} 
 
     } LIMIT """ + str(limit) + """ OFFSET """ + str(offset) + """
     """
@@ -519,3 +520,81 @@ def load_sparql_query_by_chunks(limit: int, get_method):
 
     data = final_data
     return data
+
+def load_language_dict_csv() -> dict:
+    filename = download_language_dict_csv()
+    data_csv = pd.read_csv(filename, dtype={
+        'item': 'S',
+        'kod': 'S',
+    })
+
+    language_dict = {}
+    for line in data_csv.to_dict('records'):
+        language_dict[line['kod']] = line['item']
+    return language_dict
+
+
+def download_language_dict_csv() -> str:
+    url = "https://raw.githubusercontent.com/wmcz/WMCZ-scripts/main/jazyky.csv"
+    # print(url)
+    filename = 'jazyky.csv'
+
+    try:
+    # creating HTTP response object from given url
+        resp = requests.get(url)
+
+        # saving the xml file
+        with open(filename, 'wb') as f:
+            f.write(resp.content)
+    except requests.ConnectionError:
+        filename = "jazyky_default.csv"
+
+    return filename
+
+def get_all_non_deprecated_items_languages(limit: Union[int, None] = None, offset: Union[int, None] = None) -> dict[
+    dict[str, list, list]]:
+    non_deprecated_dictionary: dict[dict[str, list, list]] = {}
+
+    query = """
+    select  ?item ?nkcr ?language where {
+        ?item p:P691 [ps:P691 ?nkcr ; wikibase:rank ?rank ] filter(?rank != wikibase:DeprecatedRank) .
+        OPTIONAL{?item wdt:P1412 ?language}.
+        # VALUES ?nkcr {'ntk20221171270' 'jn20000701355' 'jn19990003840' 'zmp20221171377' 'av20221171362' 'xx0279716'}
+    }  LIMIT """ + str(limit) + """ OFFSET """ + str(offset) + """
+    """
+    query_object = mySparql.MySparqlQuery()
+    try:
+        data_non_deprecated = query_object.select(query=query, full_data=True)
+    except simplejson.errors.JSONDecodeError:
+        return non_deprecated_dictionary
+    except rapidjson.JSONDecodeError:
+        return non_deprecated_dictionary
+
+    if type(data_non_deprecated) is None:
+        return non_deprecated_dictionary
+
+    # non_deprecated_dictionary_cache = []
+    item_non_deprecated: dict[str, Union[
+        pywikibot.data.sparql.URI, pywikibot.data.sparql.Literal, Union[pywikibot.data.sparql.Literal, None], Union[
+            pywikibot.data.sparql.Literal, None]]]
+    for item_non_deprecated in data_non_deprecated:
+        if item_non_deprecated['language'] is not None:
+            language = item_non_deprecated['language'].getID()
+        else:
+            language = None
+
+        if non_deprecated_dictionary.get(item_non_deprecated['nkcr'].value, None):
+            if language is not None:
+                non_deprecated_dictionary[item_non_deprecated['nkcr'].value]['language'].append(language)
+        else:
+            if language is not None:
+                language_add = [language]
+            else:
+                language_add = []
+
+            non_deprecated_dictionary[item_non_deprecated['nkcr'].value] = {
+                'qid': item_non_deprecated['item'].getID(),
+                'language': language_add,
+            }
+    del data_non_deprecated
+    return non_deprecated_dictionary

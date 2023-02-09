@@ -4,7 +4,7 @@ from typing import Union
 from nkcr_exceptions import BadItemException
 
 name_to_nkcr: dict = {}
-
+language_dict: dict = {}
 
 def clean_last_comma(string: str) -> str:
     if string.endswith(','):
@@ -54,6 +54,28 @@ def prepare_occupation_from_nkcr(occupation_string: str) -> Union[str, list]:
         #         print(e)
         #         pass
     return occupations
+
+def prepare_language_from_nkcr(language_string: str) -> Union[str, list]:
+    nkcr_to_qid = language_dict
+    languages = []
+    # log_with_date_time(occupation_string)
+    if type(language_string) == str:
+        if language_string.strip() == '':
+            return languages
+        splitted_languages = language_string.strip().split('$')
+
+        try:
+            languages = [nkcr_to_qid[language] for language in splitted_languages]
+        except KeyError as e:
+            print(e)
+        # for occupation in splitted_occupations:
+        #     try:
+        #         occupation_qid = nkcr_to_qid[occupation]
+        #         occupations.append(clean_qid(occupation_qid))
+        #     except KeyError as e:
+        #         print(e)
+        #         pass
+    return languages
 
 def prepare_places_from_nkcr(place_string: str) -> Union[str, list]:
     nkcr_to_qid = name_to_nkcr
@@ -112,6 +134,7 @@ def prepare_column_of_content(column: str, row) -> Union[str, Union[str, list]]:
         '370a': prepare_places_from_nkcr,
         '370b': prepare_places_from_nkcr,
         '370f': prepare_places_from_nkcr,
+        '377a': prepare_language_from_nkcr,
     }
     return column_to_method_dictionary[column](row[column])
 
@@ -132,4 +155,6 @@ def resolve_exist_claims(column: str, wd_data: dict) -> Union[str, list]:
         claims = wd_data['death']
     if column == '370f':
         claims = wd_data['work']
+    if column == '377a':
+        claims = wd_data['language']
     return claims
