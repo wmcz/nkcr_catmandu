@@ -89,13 +89,15 @@ def prepare_places_from_nkcr(place_string: str) -> Union[str, list]:
         subst = "\\1 (\\2)"
         corrected_splitted_places: list = []
         for place in splitted_places:
-            # You can manually specify the number of replacements by changing the 4th argument
-            result = re.sub(regex, subst, place.strip(), 0, re.MULTILINE)
-
-            if result:
-                corrected_splitted_places.append(result)
-            else:
+            if (place.strip().find('(') != -1):
                 corrected_splitted_places.append(place)
+            else:
+                result = re.sub(regex, subst, place.strip(), 0, re.MULTILINE)
+
+                if result:
+                    corrected_splitted_places.append(result)
+                else:
+                    corrected_splitted_places.append(place)
 
         try:
             places = [nkcr_to_qid[corrected_place] for corrected_place in corrected_splitted_places]
