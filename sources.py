@@ -34,23 +34,24 @@ class Loader:
         log_with_date_time('loaded language dict from github')
 
         self.non_deprecated_items_languages = load_sparql_query_by_chunks(self.limit, get_all_non_deprecated_items_languages)
-        log_with_date_time('non deprecated items languages used read')
+        log_with_date_time('non deprecated items languages used read, size: ' + str(len(self.non_deprecated_items_languages)))
+
 
         self.non_deprecated_items_field_of_work_and_occupation = load_sparql_query_by_chunks(self.limit,
                                                                                              get_all_non_deprecated_items_field_of_work_and_occupation)
-        log_with_date_time('non deprecated items field of work and occupation read')
+        log_with_date_time('non deprecated items field of work and occupation read, size: ' + str(len(self.non_deprecated_items_field_of_work_and_occupation)))
 
         self.non_deprecated_items_places = load_sparql_query_by_chunks(self.limit, get_all_non_deprecated_items_places)
-        log_with_date_time('non deprecated items places read')
+        log_with_date_time('non deprecated items places read, size: ' + str(len(self.non_deprecated_items_places)))
 
         self.non_deprecated_items = load_sparql_query_by_chunks(self.limit, get_all_non_deprecated_items)
-        log_with_date_time('non deprecated items read')
+        log_with_date_time('non deprecated items read, size: ' + str(len(self.non_deprecated_items)))
 
         self.name_to_nkcr = get_occupations()
-        log_with_date_time('occupations read')
+        log_with_date_time('occupations read, size: ' + str(len(self.name_to_nkcr)))
 
         self.qid_to_nkcr = make_qid_database(self.non_deprecated_items)
-        log_with_date_time('qid_to_nkcr read')
+        log_with_date_time('qid_to_nkcr read, size: ' + str(len(self.qid_to_nkcr)))
         cleaners.name_to_nkcr = self.name_to_nkcr
         cleaners.language_dict = self.languages_dict
         self.chunks = load_nkcr_items(self.file_name)
