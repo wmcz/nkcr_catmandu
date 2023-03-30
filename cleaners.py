@@ -18,6 +18,12 @@ def clean_qid(string: str) -> str:
     if first_letter.upper() != 'Q':
         raise BadItemException(string)
 
+    regex = r"Q[0-9]+"
+
+    match = re.search(regex, string, re.IGNORECASE)
+    if not match:
+        raise BadItemException(string)
+
     return string
 
 
