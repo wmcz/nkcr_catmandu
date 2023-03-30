@@ -6,7 +6,7 @@ from tools import *
 
 class Loader:
 
-    limit: int = 50000
+    limit: int = 100000
 
     def __init__(self):
         self.chunks: Union[pandas.DataFrame, None] = None
