@@ -131,7 +131,7 @@ def get_occupations() -> dict[dict[str, list, list]]:
 
         ?item p:P691 ?s .
         ?s wikibase:rank ?rank filter(?rank != wikibase:DeprecatedRank) .
-        ?s ps:P691 ?value filter(strstarts(str(?value),"ph") || strstarts(str(?value),"fd") || strstarts(str(?value),"ge") ) .
+        ?s ps:P691 ?value filter(strstarts(str(?value),"ph") || strstarts(str(?value),"fd") || strstarts(str(?value),"ge") || strstarts(str(?value),"xx") ) .
         ?s pq:P1810 ?string .
     }
     """
