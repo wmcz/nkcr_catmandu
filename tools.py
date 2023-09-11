@@ -66,11 +66,11 @@ def add_new_field_to_item(debug: bool, repo: pywikibot_extension.MyDataSite, ite
         final = {'item': item_new_field.getID(), 'prop': property_new_field, 'value': value}
         write_log(final)
     else:
-        item_new_field.addClaim(new_claim, tags=['Czech-Authorities-Sync'])
         sources.append(source_nkcr)
         sources.append(source_nkcr_aut)
         sources.append(source_date)
-        new_claim.addSources(sources, tags=['Czech-Authorities-Sync'])
+        new_claim.addSources(sources)
+        item_new_field.addClaim(new_claim, tags=['Czech-Authorities-Sync'])
 
 
 def add_nkcr_aut_to_item(debug: bool, repo: pywikibot_extension.MyDataSite, item_to_add: pywikibot.ItemPage,
@@ -97,12 +97,12 @@ def add_nkcr_aut_to_item(debug: bool, repo: pywikibot_extension.MyDataSite, item
         write_log(final)
         # print(final)
     else:
-        item_to_add.addClaim(new_claim, tags=['Czech-Authorities-Sync'])
         sources.append(source_nkcr)
         sources.append(source_nkcr_aut)
         sources.append(source_date)
-        new_claim.addSources(sources, tags=['Czech-Authorities-Sync'])
-        new_claim.addQualifier(qualifier, tags=['Czech-Authorities-Sync'])
+        new_claim.addSources(sources)
+        new_claim.addQualifier(qualifier)
+        item_to_add.addClaim(new_claim, tags=['Czech-Authorities-Sync'])
 
 
 def get_nkcr_auts_from_item(datas) -> list:
