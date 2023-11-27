@@ -21,6 +21,7 @@ class Config:
         'Q15686806',
         'Q12319698',
         'Q23305046',
+        'Q83307',
 
     ]
     fields_of_work_not_used_in_field_of_work_because_is_not_ok: list[str] = [
