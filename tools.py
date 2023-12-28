@@ -179,7 +179,7 @@ def get_all_non_deprecated_items(limit: Union[int, None] = None, offset: Union[i
         ?item p:P691 [ps:P691 ?nkcr ; wikibase:rank ?rank ] filter(?rank != wikibase:DeprecatedRank) .
         OPTIONAL{?item wdt:P213 ?isni}.
         OPTIONAL{?item wdt:P496 ?orcid}.
-        # VALUES ?nkcr {'xx0279487' 'xx0137101' 'xx0136031' 'xx0277028'}
+        # VALUES ?nkcr {'xx0226992' 'xx0137101' 'xx0136031' 'xx0277028'}
     } LIMIT """ + str(limit) + """ OFFSET """ + str(offset) + """
     """
 
@@ -241,7 +241,7 @@ def get_all_non_deprecated_items_occupation(limit: Union[int, None] = None, offs
     select ?item ?nkcr ?occup where {
         ?item p:P691 [ps:P691 ?nkcr ; wikibase:rank ?rank ] filter(?rank != wikibase:DeprecatedRank) .
         OPTIONAL{?item wdt:P106 ?occup}.
-       #  VALUES ?nkcr {'xx0279487' 'xx0137101' 'xx0136031' 'xx0277028'}
+        # VALUES ?nkcr {'xx0226992' 'xx0137101' 'xx0136031' 'xx0277028'}
         
     } LIMIT """ + str(limit) + """ OFFSET """ + str(offset) + """
     """
@@ -298,7 +298,7 @@ def get_all_non_deprecated_items_field_of_work_and_occupation(limit: Union[int, 
         ?item p:P691 [ps:P691 ?nkcr ; wikibase:rank ?rank ] filter(?rank != wikibase:DeprecatedRank) .
         OPTIONAL{?item wdt:P101 ?field}.
         OPTIONAL{?item wdt:P106 ?occup}.
-       #  VALUES ?nkcr {'xx0279487' 'xx0137101' 'xx0136031' 'xx0277028'}
+       #  VALUES ?nkcr {'xx0226992' 'xx0137101' 'xx0136031' 'xx0277028'}
 
     } LIMIT """ + str(limit) + """ OFFSET """ + str(offset) + """
     """
@@ -367,7 +367,7 @@ def get_all_non_deprecated_items_places(limit: Union[int, None] = None, offset: 
         OPTIONAL{?item wdt:P19 ?birth}.
         OPTIONAL{?item wdt:P20 ?death}.
         OPTIONAL{?item wdt:P937 ?work}.
-        # VALUES ?nkcr {'xx0279487' 'xx0137101' 'xx0136031' 'xx0277028'}
+       #  VALUES ?nkcr {'xx0226992' 'xx0137101' 'xx0136031' 'xx0277028'}
     }  LIMIT """ + str(limit) + """ OFFSET """ + str(offset) + """
     """
     # if (limit is not None):
@@ -559,7 +559,7 @@ def get_all_non_deprecated_items_languages(limit: Union[int, None] = None, offse
     select  ?item ?nkcr ?language where {
         ?item p:P691 [ps:P691 ?nkcr ; wikibase:rank ?rank ] filter(?rank != wikibase:DeprecatedRank) .
         OPTIONAL{?item wdt:P1412 ?language}.
-         # VALUES ?nkcr {'xx0279487' 'xx0137101' 'xx0136031' 'xx0277028'}
+        # VALUES ?nkcr {'xx0226992' 'xx0137101' 'xx0136031' 'xx0277028'}
     }  LIMIT """ + str(limit) + """ OFFSET """ + str(offset) + """
     """
     query_object = mySparql.MySparqlQuery()
