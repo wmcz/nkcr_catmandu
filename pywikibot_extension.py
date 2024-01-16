@@ -14,7 +14,7 @@ class MyItemPage(pywikibot.ItemPage):
     }
 
 
-class MyDataSite(pywikibot.DataSite):
+class MyDataSite(pywikibot.site.DataSite):
     @need_right('edit')
     def addClaim(self, entity, claim, bot=True, summary=None, tags=None):
         """
