@@ -230,7 +230,7 @@ def get_all_non_deprecated_items(limit: Union[int, None] = None, offset: Union[i
                 orcid_add = []
 
             non_deprecated_dictionary[item_non_deprecated['nkcr']] = {
-                'qid': item_non_deprecated['item'].getID(),
+                'qid': item_non_deprecated['item'].replace('http://www.wikidata.org/entity/', ''),
                 'isni': isni_add,
                 'orcid': orcid_add,
             }
