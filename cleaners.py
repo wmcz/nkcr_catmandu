@@ -130,7 +130,7 @@ def prepare_isni_from_nkcr(isni: str) -> str:
     else:
         n = 4
         str_chunks = [isni[i:i + n] for i in range(0, len(isni), n)]
-        return ' '.join(str_chunks)
+        return ''.join(str_chunks)
 
 
 def prepare_column_of_content(column: str, row) -> Union[str, Union[str, list]]:
