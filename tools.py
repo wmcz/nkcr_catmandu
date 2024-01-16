@@ -9,6 +9,7 @@ import rapidjson
 import requests
 import simplejson.errors
 from pywikibot.data import sparql
+from wikibaseintegrator import wbi_helpers
 
 import mySparql
 import pywikibot_extension
@@ -186,7 +187,7 @@ def get_all_non_deprecated_items(limit: Union[int, None] = None, offset: Union[i
     # query_object = sparql.SparqlQuery()
     query_object = mySparql.MySparqlQuery()
     try:
-        data_non_deprecated = query_object.select(query=query, full_data=True)
+        data_non_deprecated = query_object.select(query=query, full_data=False)
     except simplejson.errors.JSONDecodeError:
         return non_deprecated_dictionary
     except rapidjson.JSONDecodeError:
@@ -252,7 +253,7 @@ def get_all_non_deprecated_items_occupation(limit: Union[int, None] = None, offs
     query_object = mySparql.MySparqlQuery()
 
     try:
-        data_non_deprecated = query_object.select(query=query, full_data=True)
+        data_non_deprecated = query_object.select(query=query, full_data=False)
     except simplejson.errors.JSONDecodeError:
         return non_deprecated_dictionary
     except rapidjson.JSONDecodeError:
@@ -267,21 +268,21 @@ def get_all_non_deprecated_items_occupation(limit: Union[int, None] = None, offs
             pywikibot.data.sparql.Literal, None]]]
     for item_non_deprecated in data_non_deprecated:
         if item_non_deprecated['occup'] is not None:
-            occupation = item_non_deprecated['occup'].getID()
+            occupation = item_non_deprecated['occup'].replace('http://www.wikidata.org/entity/', '')
         else:
             occupation = None
 
-        if non_deprecated_dictionary.get(item_non_deprecated['nkcr'].value, None):
+        if non_deprecated_dictionary.get(item_non_deprecated['nkcr'], None):
             if occupation is not None:
-                non_deprecated_dictionary[item_non_deprecated['nkcr'].value]['occup'].append(occupation)
+                non_deprecated_dictionary[item_non_deprecated['nkcr']]['occup'].append(occupation)
         else:
             if occupation is not None:
                 occupation_add = [occupation]
             else:
                 occupation_add = []
 
-            non_deprecated_dictionary[item_non_deprecated['nkcr'].value] = {
-                'qid': item_non_deprecated['item'].getID(),
+            non_deprecated_dictionary[item_non_deprecated['nkcr']] = {
+                'qid': item_non_deprecated['item'].replace('http://www.wikidata.org/entity/', ''),
                 'occup': occupation_add,
             }
     del data_non_deprecated
@@ -308,7 +309,7 @@ def get_all_non_deprecated_items_field_of_work_and_occupation(limit: Union[int, 
     # query_object = sparql.SparqlQuery()
     query_object = mySparql.MySparqlQuery()
     try:
-        data_non_deprecated = query_object.select(query=query, full_data=True)
+        data_non_deprecated = query_object.select(query=query, full_data=False)
     except simplejson.errors.JSONDecodeError:
         return non_deprecated_dictionary
     except rapidjson.JSONDecodeError:
@@ -323,21 +324,21 @@ def get_all_non_deprecated_items_field_of_work_and_occupation(limit: Union[int, 
             pywikibot.data.sparql.Literal, None]]]
     for item_non_deprecated in data_non_deprecated:
         if item_non_deprecated['field'] is not None:
-            field_of_work = item_non_deprecated['field'].getID()
+            field_of_work = item_non_deprecated['field'].replace('http://www.wikidata.org/entity/', '')
         else:
             field_of_work = None
 
         if item_non_deprecated['occup'] is not None:
-            occupation = item_non_deprecated['occup'].getID()
+            occupation = item_non_deprecated['occup'].replace('http://www.wikidata.org/entity/', '')
         else:
             occupation = None
 
-        if non_deprecated_dictionary.get(item_non_deprecated['nkcr'].value, None):
+        if non_deprecated_dictionary.get(item_non_deprecated['nkcr'], None):
             if field_of_work is not None:
-                non_deprecated_dictionary[item_non_deprecated['nkcr'].value]['field'].append(field_of_work)
+                non_deprecated_dictionary[item_non_deprecated['nkcr']]['field'].append(field_of_work)
 
             if occupation is not None:
-                non_deprecated_dictionary[item_non_deprecated['nkcr'].value]['occup'].append(occupation)
+                non_deprecated_dictionary[item_non_deprecated['nkcr']]['occup'].append(occupation)
         else:
             if field_of_work is not None:
                 field_of_work_add = [field_of_work]
@@ -350,7 +351,7 @@ def get_all_non_deprecated_items_field_of_work_and_occupation(limit: Union[int, 
                 occupation_add = []
 
             non_deprecated_dictionary[item_non_deprecated['nkcr'].value] = {
-                'qid': item_non_deprecated['item'].getID(),
+                'qid': item_non_deprecated['item'].replace('http://www.wikidata.org/entity/', ''),
                 'field': field_of_work_add,
                 'occup': occupation_add,
             }
@@ -376,7 +377,7 @@ def get_all_non_deprecated_items_places(limit: Union[int, None] = None, offset: 
     # query_object = sparql.SparqlQuery()
     query_object = mySparql.MySparqlQuery()
     try:
-        data_non_deprecated = query_object.select(query=query, full_data=True)
+        data_non_deprecated = query_object.select(query=query, full_data=False)
     except simplejson.errors.JSONDecodeError:
         return non_deprecated_dictionary
     except rapidjson.JSONDecodeError:
@@ -387,31 +388,31 @@ def get_all_non_deprecated_items_places(limit: Union[int, None] = None, offset: 
 
     # non_deprecated_dictionary_cache = []
     item_non_deprecated: dict[str, Union[
-        pywikibot.data.sparql.URI, pywikibot.data.sparql.Literal, Union[pywikibot.data.sparql.Literal, None], Union[
+        str, str, Union[pywikibot.data.sparql.Literal, None], Union[
             pywikibot.data.sparql.Literal, None]]]
     for item_non_deprecated in data_non_deprecated:
         if item_non_deprecated['birth'] is not None:
-            birth = item_non_deprecated['birth'].getID()
+            birth = item_non_deprecated['birth'].replace('http://www.wikidata.org/entity/', '')
         else:
             birth = None
 
         if item_non_deprecated['death'] is not None:
-            death = item_non_deprecated['death'].getID()
+            death = item_non_deprecated['death'].replace('http://www.wikidata.org/entity/', '')
         else:
             death = None
 
         if item_non_deprecated['work'] is not None:
-            work = item_non_deprecated['work'].getID()
+            work = item_non_deprecated['work'].replace('http://www.wikidata.org/entity/', '')
         else:
             work = None
 
-        if non_deprecated_dictionary.get(item_non_deprecated['nkcr'].value, None):
+        if non_deprecated_dictionary.get(item_non_deprecated['nkcr'], None):
             if birth is not None:
-                non_deprecated_dictionary[item_non_deprecated['nkcr'].value]['birth'].append(birth)
+                non_deprecated_dictionary[item_non_deprecated['nkcr']]['birth'].append(birth)
             if death is not None:
-                non_deprecated_dictionary[item_non_deprecated['nkcr'].value]['death'].append(death)
+                non_deprecated_dictionary[item_non_deprecated['nkcr']]['death'].append(death)
             if work is not None:
-                non_deprecated_dictionary[item_non_deprecated['nkcr'].value]['work'].append(work)
+                non_deprecated_dictionary[item_non_deprecated['nkcr']]['work'].append(work)
         else:
             if birth is not None:
                 birth_add = [birth]
@@ -429,7 +430,7 @@ def get_all_non_deprecated_items_places(limit: Union[int, None] = None, offset: 
                 work_add = []
 
             non_deprecated_dictionary[item_non_deprecated['nkcr'].value] = {
-                'qid': item_non_deprecated['item'].getID(),
+                'qid': item_non_deprecated['item'].replace('http://www.wikidata.org/entity/', ''),
                 'birth': birth_add,
                 'death': death_add,
                 'work': work_add,
@@ -564,7 +565,7 @@ def get_all_non_deprecated_items_languages(limit: Union[int, None] = None, offse
     """
     query_object = mySparql.MySparqlQuery()
     try:
-        data_non_deprecated = query_object.select(query=query, full_data=True)
+        data_non_deprecated = query_object.select(query=query, full_data=False)
     except simplejson.errors.JSONDecodeError:
         return non_deprecated_dictionary
     except rapidjson.JSONDecodeError:
@@ -579,21 +580,21 @@ def get_all_non_deprecated_items_languages(limit: Union[int, None] = None, offse
             pywikibot.data.sparql.Literal, None]]]
     for item_non_deprecated in data_non_deprecated:
         if item_non_deprecated['language'] is not None:
-            language = item_non_deprecated['language'].getID()
+            language = item_non_deprecated['language'].replace('http://www.wikidata.org/entity/', '')
         else:
             language = None
 
-        if non_deprecated_dictionary.get(item_non_deprecated['nkcr'].value, None):
+        if non_deprecated_dictionary.get(item_non_deprecated['nkcr'], None):
             if language is not None:
-                non_deprecated_dictionary[item_non_deprecated['nkcr'].value]['language'].append(language)
+                non_deprecated_dictionary[item_non_deprecated['nkcr']]['language'].append(language)
         else:
             if language is not None:
                 language_add = [language]
             else:
                 language_add = []
 
-            non_deprecated_dictionary[item_non_deprecated['nkcr'].value] = {
-                'qid': item_non_deprecated['item'].getID(),
+            non_deprecated_dictionary[item_non_deprecated['nkcr']] = {
+                'qid': item_non_deprecated['item'].replace('http://www.wikidata.org/entity/', ''),
                 'language': language_add,
             }
     del data_non_deprecated
