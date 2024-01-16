@@ -158,6 +158,8 @@ def get_occupations() -> dict[dict[str, list, list]]:
         return occupation_dictionary
     except rapidjson.JSONDecodeError:
         return occupation_dictionary
+    except pywikibot.exceptions.ServerError:
+        return occupation_dictionary
 
     for item_occupation in data_occupation:
         if item_occupation['string'] is not None:
@@ -191,6 +193,8 @@ def get_all_non_deprecated_items(limit: Union[int, None] = None, offset: Union[i
     except simplejson.errors.JSONDecodeError:
         return non_deprecated_dictionary
     except rapidjson.JSONDecodeError:
+        return non_deprecated_dictionary
+    except pywikibot.exceptions.ServerError:
         return non_deprecated_dictionary
 
     # non_deprecated_dictionary_cache = []
@@ -258,6 +262,8 @@ def get_all_non_deprecated_items_occupation(limit: Union[int, None] = None, offs
         return non_deprecated_dictionary
     except rapidjson.JSONDecodeError:
         return non_deprecated_dictionary
+    except pywikibot.exceptions.ServerError:
+        return non_deprecated_dictionary
 
     if type(data_non_deprecated) is None:
         return non_deprecated_dictionary
@@ -313,6 +319,8 @@ def get_all_non_deprecated_items_field_of_work_and_occupation(limit: Union[int, 
     except simplejson.errors.JSONDecodeError:
         return non_deprecated_dictionary
     except rapidjson.JSONDecodeError:
+        return non_deprecated_dictionary
+    except pywikibot.exceptions.ServerError:
         return non_deprecated_dictionary
 
     if type(data_non_deprecated) is None:
@@ -381,6 +389,8 @@ def get_all_non_deprecated_items_places(limit: Union[int, None] = None, offset: 
     except simplejson.errors.JSONDecodeError:
         return non_deprecated_dictionary
     except rapidjson.JSONDecodeError:
+        return non_deprecated_dictionary
+    except pywikibot.exceptions.ServerError:
         return non_deprecated_dictionary
 
     if type(data_non_deprecated) is None:
@@ -569,6 +579,8 @@ def get_all_non_deprecated_items_languages(limit: Union[int, None] = None, offse
     except simplejson.errors.JSONDecodeError:
         return non_deprecated_dictionary
     except rapidjson.JSONDecodeError:
+        return non_deprecated_dictionary
+    except pywikibot.exceptions.ServerError:
         return non_deprecated_dictionary
 
     if type(data_non_deprecated) is None:
