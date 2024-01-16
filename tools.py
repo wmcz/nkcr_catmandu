@@ -199,21 +199,21 @@ def get_all_non_deprecated_items(limit: Union[int, None] = None, offset: Union[i
             pywikibot.data.sparql.Literal, None]]]
     for item_non_deprecated in data_non_deprecated:
         if item_non_deprecated['isni'] is not None:
-            isni = item_non_deprecated['isni'].value
+            isni = item_non_deprecated['isni']
         else:
             isni = None
 
         if item_non_deprecated['orcid'] is not None:
-            orcid = item_non_deprecated['orcid'].value
+            orcid = item_non_deprecated['orcid']
         else:
             orcid = None
 
-        if non_deprecated_dictionary.get(item_non_deprecated['nkcr'].value, None):
+        if non_deprecated_dictionary.get(item_non_deprecated['nkcr'], None):
             if isni is not None:
-                non_deprecated_dictionary[item_non_deprecated['nkcr'].value]['isni'].append(isni)
+                non_deprecated_dictionary[item_non_deprecated['nkcr']]['isni'].append(isni)
 
             if orcid is not None:
-                non_deprecated_dictionary[item_non_deprecated['nkcr'].value]['orcid'].append(orcid)
+                non_deprecated_dictionary[item_non_deprecated['nkcr']]['orcid'].append(orcid)
         else:
             if isni is not None:
                 isni_add = [isni]
@@ -225,7 +225,7 @@ def get_all_non_deprecated_items(limit: Union[int, None] = None, offset: Union[i
             else:
                 orcid_add = []
 
-            non_deprecated_dictionary[item_non_deprecated['nkcr'].value] = {
+            non_deprecated_dictionary[item_non_deprecated['nkcr']] = {
                 'qid': item_non_deprecated['item'].getID(),
                 'isni': isni_add,
                 'orcid': orcid_add,
@@ -350,7 +350,7 @@ def get_all_non_deprecated_items_field_of_work_and_occupation(limit: Union[int, 
             else:
                 occupation_add = []
 
-            non_deprecated_dictionary[item_non_deprecated['nkcr'].value] = {
+            non_deprecated_dictionary[item_non_deprecated['nkcr']] = {
                 'qid': item_non_deprecated['item'].replace('http://www.wikidata.org/entity/', ''),
                 'field': field_of_work_add,
                 'occup': occupation_add,
@@ -429,7 +429,7 @@ def get_all_non_deprecated_items_places(limit: Union[int, None] = None, offset: 
             else:
                 work_add = []
 
-            non_deprecated_dictionary[item_non_deprecated['nkcr'].value] = {
+            non_deprecated_dictionary[item_non_deprecated['nkcr']] = {
                 'qid': item_non_deprecated['item'].replace('http://www.wikidata.org/entity/', ''),
                 'birth': birth_add,
                 'death': death_add,
