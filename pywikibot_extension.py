@@ -41,7 +41,7 @@ class MyDataSite(pywikibot.site.DataSite):
                   'bot': bot,
                   'tags': tags
                   }
-        req = self._simple_request(**params)
+        req = self.simple_request(**params)
         jsonvys = claim.toJSON()
         data = req.submit()
         # Update the item
