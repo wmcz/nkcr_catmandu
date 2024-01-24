@@ -1,4 +1,5 @@
 import argparse
+import configparser
 import time
 
 import requests
@@ -44,7 +45,7 @@ if __name__ == '__main__':
         chunk = chunk[chunk['100a'] != '']
         for row in chunk.to_dict('records'):
             nkcr_aut = row['_id']
-
+            save = True
             count = count + 1
 
             if count % 10000 == 0:
@@ -67,13 +68,20 @@ if __name__ == '__main__':
                         nkcr_auts = loader.qid_to_nkcr.get(qid, [])
                         if nkcr_aut not in nkcr_auts:
                             datas = item.get(get_redirect=True)
+                            instances_from_item = get_claim_from_item_by_property(datas, 'P31')
+                            for instance_from_item in instances_from_item:
+                                if instance_from_item.getID() in Config.instances_not_possible_for_nkcr:
+                                    save = False
+                                    raise ValueError('Nepovolená instance položky: ' + str(instance_from_item.getID()))
                             nkcr_auts_from_wd = get_nkcr_auts_from_item(datas)
                             if nkcr_aut not in nkcr_auts_from_wd:
                                 try:
                                     if item.isRedirectPage():
                                         item = item.getRedirectTarget()
                                         item.get(get_redirect=True)
-                                    add_nkcr_aut_to_item(Config.debug, repo, item, nkcr_aut, name)
+                                    if save:
+                                        add_nkcr_aut_to_item(Config.debug, repo, item, nkcr_aut, name)
+
                                     loader.non_deprecated_items[nkcr_aut] = {
                                         'qid': qid,
                                         'isni': [],
@@ -85,43 +93,46 @@ if __name__ == '__main__':
                                     log_with_date_time(str(e))
                     except KeyError as e:
                         log_with_date_time('key err')
+                    except ValueError as e:
+                        log_with_date_time(str(e))
                 ms = time.time()
                 # print(ms)
-                processor.set_nkcr_aut(nkcr_aut)
-                processor.set_qid(qid)
-                if item is not None:
-                    processor.set_item(item)
-                else:
-                    processor.set_item(None)
-                processor.set_row(row)
+                if save:
+                    processor.set_nkcr_aut(nkcr_aut)
+                    processor.set_qid(qid)
+                    if item is not None:
+                        processor.set_item(item)
+                    else:
+                        processor.set_item(None)
+                    processor.set_row(row)
 
-                properties = {
-                    '0247a-isni': 'P213',
-                    '0247a-orcid': 'P496',
-                }
-                processor.set_enabled_columns(properties)
-                processor.process_occupation_type(loader.non_deprecated_items)
+                    properties = {
+                        '0247a-isni': 'P213',
+                        '0247a-orcid': 'P496',
+                    }
+                    processor.set_enabled_columns(properties)
+                    processor.process_occupation_type(loader.non_deprecated_items)
 
-                properties = {
-                    '374a': 'P106',
-                    '372a': 'P101',
-                }
-                processor.set_enabled_columns(properties)
-                processor.process_occupation_type(loader.non_deprecated_items_field_of_work_and_occupation)
+                    properties = {
+                        '374a': 'P106',
+                        '372a': 'P101',
+                    }
+                    processor.set_enabled_columns(properties)
+                    processor.process_occupation_type(loader.non_deprecated_items_field_of_work_and_occupation)
 
-                properties = {
-                    '377a': 'P1412',
-                }
-                processor.set_enabled_columns(properties)
-                processor.process_occupation_type(loader.non_deprecated_items_languages)
+                    properties = {
+                        '377a': 'P1412',
+                    }
+                    processor.set_enabled_columns(properties)
+                    processor.process_occupation_type(loader.non_deprecated_items_languages)
 
-                properties = {
-                    '370a': 'P19',
-                    '370b': 'P20',
-                    '370f': 'P937',
-                }
-                processor.set_enabled_columns(properties)
-                processor.process_occupation_type(loader.non_deprecated_items_places)
+                    properties = {
+                        '370a': 'P19',
+                        '370b': 'P20',
+                        '370f': 'P937',
+                    }
+                    processor.set_enabled_columns(properties)
+                    processor.process_occupation_type(loader.non_deprecated_items_places)
             except BadItemException as e:
                 log_with_date_time(str(e))
             except pywikibot.exceptions.NoPageError as e:
