@@ -47,6 +47,13 @@ def print_info(debug):
 def add_new_field_to_item(debug: bool, repo: pywikibot_extension.MyDataSite, item_new_field: pywikibot.ItemPage,
                           property_new_field: str, value: object,
                           nkcr_aut_new_field: str):
+
+    claims_by_property = item_new_field.claims.get('P691', [])
+    for claim in claims_by_property:
+        if claim.getRank() == 'deprecated' and nkcr_aut_new_field == claim.getTarget():
+            #deprecated so not add
+            return None
+
     sources = []
 
     source_nkcr = pywikibot.Claim(repo, 'P248')
