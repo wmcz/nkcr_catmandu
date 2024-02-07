@@ -141,5 +141,7 @@ if __name__ == '__main__':
                 log_with_date_time(str(e))
             except pywikibot.exceptions.APIError as e:
                 log_with_date_time(str(e))
+            except pywikibot.exceptions.InvalidTitleError as e:
+                log_with_date_time(str(e))
 
             # logger.logComplete(nkcr_aut)
