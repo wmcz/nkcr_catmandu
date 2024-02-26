@@ -1,3 +1,4 @@
+import logging
 import re
 from typing import Union
 
@@ -5,6 +6,9 @@ from nkcr_exceptions import BadItemException
 
 name_to_nkcr: dict = {}
 language_dict: dict = {}
+
+log = logging.getLogger(__name__)
+
 
 def clean_last_comma(string: str) -> str:
     if string.endswith(','):
@@ -49,9 +53,15 @@ def prepare_occupation_from_nkcr(occupation_string: str) -> Union[str, list]:
         splitted_occupations = occupation_string.strip().split('|')
 
         try:
-            occupations = [nkcr_to_qid[occupation] for occupation in splitted_occupations]
+            # occupations = [nkcr_to_qid[occupation] for occupation in splitted_occupations]
+            occupations = []
+            for occupation in splitted_occupations:
+                if occupation in nkcr_to_qid:
+                    occupations.append(nkcr_to_qid[occupation])
+                else:
+                    log.warning('key_err: ' + occupation)
         except KeyError as e:
-            print(e)
+            log.warning('key_err: ' + str(e))
         # for occupation in splitted_occupations:
         #     try:
         #         occupation_qid = nkcr_to_qid[occupation]
@@ -71,9 +81,15 @@ def prepare_language_from_nkcr(language_string: str) -> Union[str, list]:
         splitted_languages = language_string.strip().split('$')
 
         try:
-            languages = [nkcr_to_qid[language] for language in splitted_languages]
+            # languages = [nkcr_to_qid[language] for language in splitted_languages]
+            languages = []
+            for language in splitted_languages:
+                if language in nkcr_to_qid:
+                    languages.append(nkcr_to_qid[language])
+                else:
+                    log.warning('key_err: ' + language)
         except KeyError as e:
-            print(e)
+            log.info('key_err: ' + str(e))
         # for occupation in splitted_occupations:
         #     try:
         #         occupation_qid = nkcr_to_qid[occupation]
@@ -90,7 +106,10 @@ def prepare_places_from_nkcr(place_string: str) -> Union[str, list]:
     if type(place_string) == str:
         if place_string.strip() == '':
             return places
-        splitted_places = place_string.strip().split('$')
+        if ('|' in place_string and '$' not in place_string):
+            splitted_places = place_string.strip().split('|')
+        else:
+            splitted_places = place_string.strip().split('$')
         regex = r"(.*?),\W*(.*)"
         subst = "\\1 (\\2)"
         corrected_splitted_places: list = []
@@ -106,9 +125,15 @@ def prepare_places_from_nkcr(place_string: str) -> Union[str, list]:
                     corrected_splitted_places.append(place)
 
         try:
-            places = [nkcr_to_qid[corrected_place] for corrected_place in corrected_splitted_places]
+            # places = [nkcr_to_qid[corrected_place] for corrected_place in corrected_splitted_places]
+            places = []
+            for corrected_place in corrected_splitted_places:
+                if corrected_place in nkcr_to_qid:
+                    places.append(nkcr_to_qid[corrected_place])
+                else:
+                    log.warning('key_err: ' + corrected_place)
         except KeyError as e:
-            print(e)
+            log.warning('key_err: ' + str(e))
         # for occupation in splitted_occupations:
         #     try:
         #         occupation_qid = nkcr_to_qid[occupation]

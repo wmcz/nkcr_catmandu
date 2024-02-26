@@ -1,6 +1,7 @@
 class Config:
     user_name: str = 'Frettiebot'
     debug: bool = False
+    use_json_database: bool = False
     count_first_step: int = 0
     count_second_step: int = 0
 
@@ -31,16 +32,28 @@ class Config:
     ]
 
     instances_not_possible_for_nkcr: list[str] = [
-        'Q13442814',
-        'Q637866',
-        'Q13433827',
         'Q571',
-        'Q14756018',
-        'Q16684349',
         'Q8436',
+        'Q637866',
+        'Q3046146',
         'Q10648343',
-        'Q54982412',
         'Q13417114',
+        'Q13433827',
+        'Q13442814',
+        'Q14756018',
+        'Q16017119',
+        'Q16334295',
+        'Q16684349',
+        'Q54982412',
+        'Q2088357',
+        'Q1141470',
+        'Q19389637',
+        'Q484170',
+        'Q875538',
+    ]
+
+    qid_blacklist:list[str] = [
+        'Q102247991'
     ]
 
     property_occupation = 'P106'
@@ -56,5 +69,5 @@ class Config:
         '370b': 'P20',
         '370f': 'P937',
         '377a': 'P1412',
+        '_id': 'P691',
     }
-
