@@ -1,6 +1,9 @@
 import csv
 import gc
+import logging
+import os
 from datetime import datetime
+from typing import Union, Any
 
 import pandas
 import pandas as pd
@@ -10,12 +13,16 @@ import requests
 import simplejson.errors
 from pywikibot.data import sparql
 from wikibaseintegrator import wbi_helpers
+from wikibaseintegrator.datatypes import Item, ExternalID, Time, String
+from wikibaseintegrator.entities import ItemEntity
+from wikibaseintegrator.wbi_enums import WikibaseDatePrecision, WikibaseDatatype, ActionIfExists
 
 import mySparql
 import pywikibot_extension
 from cleaners import clean_last_comma
-from property_processor import *
-from os.path import exists
+from config import Config
+log = logging.getLogger(__name__)
+
 
 def write_log(fields, create_file=False):
     if create_file:
@@ -24,6 +31,7 @@ def write_log(fields, create_file=False):
         csvfile = open('debug.csv', 'a')
     writer = csv.DictWriter(csvfile, fieldnames=['item', 'prop', 'value'])
     writer.writerow(fields)
+    log.info(fields)
     csvfile.close()
 
 
@@ -38,62 +46,63 @@ def read_log() -> csv.DictReader:
     return reader
 
 
-def print_info(debug):
+def print_info(debug: bool):
     log_with_date_time('Catmandu processor for NKČR')
     if debug:
         log_with_date_time('DEBUG!!!')
 
 
-def add_new_field_to_item(debug: bool, repo: pywikibot_extension.MyDataSite, item_new_field: pywikibot.ItemPage,
-                          property_new_field: str, value: object,
-                          nkcr_aut_new_field: str):
+def add_new_field_to_item_wbi(
+        item_new_field: ItemEntity,
+        property_new_field: str, value: Union[str, int],
+        nkcr_aut_new_field: str):
 
-    claims_by_property = item_new_field.claims.get('P691', [])
-    for claim in claims_by_property:
-        if claim.getRank() == 'deprecated' and nkcr_aut_new_field == claim.getTarget():
-            #deprecated so not add
-            return None
-
-    sources = []
-
-    source_nkcr = pywikibot.Claim(repo, 'P248')
-    source_nkcr.setTarget(pywikibot.ItemPage(repo, 'Q13550863'))
-
-    source_nkcr_aut = pywikibot.Claim(repo, 'P691')
-    source_nkcr_aut.setTarget(nkcr_aut_new_field)
+    try:
+        claims_by_property = item_new_field.claims.get('P691')
+        for claim in claims_by_property:
+            if claim.rank.value == 'deprecated' and nkcr_aut_new_field == claim.mainsnak.datavalue['value']:
+                # deprecated so not add
+                return item_new_field
+    except KeyError:
+        return item_new_field
 
     now = datetime.now()
-    source_date = pywikibot.Claim(repo, 'P813')
-    source_date.setTarget(pywikibot.WbTime(year=now.year, month=now.month, day=now.day))
 
-    new_claim = pywikibot.Claim(repo, property_new_field)
-    new_claim.setTarget(value)
-    if debug:
-        if type(value) is pywikibot.ItemPage:
-            value = value.getID()
-        final = {'item': item_new_field.getID(), 'prop': property_new_field, 'value': value}
-        write_log(final)
+    references = [
+        [
+            Item(value='Q13550863', prop_nr='P248'),
+            ExternalID(value=nkcr_aut_new_field, prop_nr='P691'),
+            Time(time=now.strftime('+%Y-%m-%dT00:00:00Z'), prop_nr='P813', precision=WikibaseDatePrecision.DAY),
+        ]
+    ]
+
+    if property_new_field in ['P213', 'P496']:
+        # string
+        final = {'item': item_new_field.id, 'prop': property_new_field, 'value': value}
+        new_claim = ExternalID(value=value, prop_nr=property_new_field, references=references)
     else:
-        sources.append(source_nkcr)
-        sources.append(source_nkcr_aut)
-        sources.append(source_date)
-        new_claim.addSources(sources)
-        item_new_field.addClaim(new_claim, tags=['Czech-Authorities-Sync'])
+        final = {'item': item_new_field.id, 'prop': property_new_field, 'value': value}
+        new_claim = Item(value=value, prop_nr=property_new_field, references=references)
+    write_log(final)
+    item_new_field.claims.add(new_claim, action_if_exists=ActionIfExists.APPEND_OR_REPLACE)
+
+    return item_new_field
 
 
 def add_nkcr_aut_to_item(debug: bool, repo: pywikibot_extension.MyDataSite, item_to_add: pywikibot.ItemPage,
                          nkcr_aut_to_add: str, name_to_add: str):
+    now = datetime.now()
+
     sources = []
+
+    source_date = pywikibot.Claim(repo, 'P813')
+    source_date.setTarget(pywikibot.WbTime(year=now.year, month=now.month, day=now.day))
 
     source_nkcr = pywikibot.Claim(repo, 'P248')
     source_nkcr.setTarget(pywikibot.ItemPage(repo, 'Q13550863'))
 
     source_nkcr_aut = pywikibot.Claim(repo, 'P691')
     source_nkcr_aut.setTarget(nkcr_aut_to_add)
-
-    now = datetime.now()
-    source_date = pywikibot.Claim(repo, 'P813')
-    source_date.setTarget(pywikibot.WbTime(year=now.year, month=now.month, day=now.day))
 
     new_claim = pywikibot.Claim(repo, 'P691')
     new_claim.setTarget(nkcr_aut_to_add)
@@ -113,11 +122,53 @@ def add_nkcr_aut_to_item(debug: bool, repo: pywikibot_extension.MyDataSite, item
         item_to_add.addClaim(new_claim, tags=['Czech-Authorities-Sync'])
 
 
+def add_nkcr_aut_to_item_wbi(
+        item_to_add: ItemEntity,
+        nkcr_aut_to_add: str,
+        name_to_add: str):
+
+    now = datetime.now()
+
+    references = [
+        [
+            Item(value='Q13550863', prop_nr='P248'),
+            ExternalID(value=nkcr_aut_to_add, prop_nr='P691'),
+            Time(time=now.strftime('+%Y-%m-%dT00:00:00Z'), prop_nr='P813', precision=WikibaseDatePrecision.DAY),
+        ]
+    ]
+
+    qualifier = [
+        String(value=clean_last_comma(name_to_add), prop_nr='P1810'),
+    ]
+
+    final = {'item': item_to_add.id, 'prop': 'P691', 'value': nkcr_aut_to_add}
+    write_log(final)
+    # print(final)
+    new_claim = ExternalID(value=nkcr_aut_to_add, prop_nr='P691', references=references, qualifiers=qualifier)
+    item_to_add.claims.add(new_claim, action_if_exists=ActionIfExists.APPEND_OR_REPLACE)
+    return item_to_add
+
+
 def get_nkcr_auts_from_item(datas) -> list:
     nkcr_auts_from_data = []
     claims_from_wd = datas['claims'].get('P691', [])
     for claim in claims_from_wd:
         nkcr_auts_from_data.append(claim.getTarget())
+
+    return nkcr_auts_from_data
+
+
+def get_nkcr_auts_from_item_wbi(datas) -> list:
+    nkcr_auts_from_data = []
+    try:
+        claims_from_wd = datas.claims.get('P691')
+    except KeyError:
+        return []
+    for claim in claims_from_wd:
+        if claim.mainsnak.datatype == WikibaseDatatype.EXTERNALID.value:
+            nkcr_auts_from_data.append(claim.mainsnak.datavalue['value'])
+        else:
+            nkcr_auts_from_data.append(claim.mainsnak.datavalue['value']['literal'])
 
     return nkcr_auts_from_data
 
@@ -133,7 +184,7 @@ def make_qid_database(items: dict) -> dict[str, list[str]]:
     return return_qids
 
 
-def get_occupations() -> dict[dict[str, list, list]]:
+def get_occupations(limit: Union[int, None] = None, offset: Union[int, None] = None) -> dict[str, str]:
     query = """
     select distinct ?item ?value ?string where {
 
@@ -141,41 +192,28 @@ def get_occupations() -> dict[dict[str, list, list]]:
         ?s wikibase:rank ?rank filter(?rank != wikibase:DeprecatedRank) .
         ?s ps:P691 ?value filter(strstarts(str(?value),"ph") || strstarts(str(?value),"fd") || strstarts(str(?value),"ge") || strstarts(str(?value),"xx") ) .
         ?s pq:P1810 ?string .
-    }
+    } LIMIT """ + str(limit) + """ OFFSET """ + str(offset) + """
     """
 
-    # query = """
-    # select distinct ?item ?value ?string where {
-    #
-    #     ?item p:P691 ?s .
-    #     ?s wikibase:rank ?rank filter(?rank != wikibase:DeprecatedRank) .
-    #     ?s ps:P691 ?value .
-    #     ?s pq:P1810 ?string .
-    #     VALUES ?value {'ph121664' 'ph126519' 'ph114952'}
-    #
-    # }
-    # """
-    occupation_dictionary: dict[dict[str, list, list]] = {}
-    query_object = mySparql.MySparqlQuery()
-    # query_object = sparql.SparqlQuery()
+    occupation_dictionary: dict[str, str] = {}
 
     try:
-        data_occupation = query_object.select(query=query, full_data=True)
+        data_occupation_wbi = wbi_helpers.execute_sparql_query(query=query)
     except simplejson.errors.JSONDecodeError:
         return occupation_dictionary
-    except rapidjson.JSONDecodeError:
+    except Exception:
         return occupation_dictionary
-    except pywikibot.exceptions.ServerError:
+    except requests.exceptions.ConnectionError:
         return occupation_dictionary
 
-    for item_occupation in data_occupation:
+    for item_occupation in data_occupation_wbi['results']['bindings']:
         if item_occupation['string'] is not None:
-            name = item_occupation['string'].value
+            name = item_occupation['string']['value']
         else:
             name = None
 
-        if item_occupation['item'].getID() is not None:
-            occupation_dictionary[name] = item_occupation['item'].getID()
+        if item_occupation['item']['value']:
+            occupation_dictionary[name] = item_occupation['item']['value'].replace('http://www.wikidata.org/entity/', '')
 
     return occupation_dictionary
 
@@ -189,7 +227,7 @@ def get_all_non_deprecated_items(limit: Union[int, None] = None, offset: Union[i
         ?item p:P691 [ps:P691 ?nkcr ; wikibase:rank ?rank ] filter(?rank != wikibase:DeprecatedRank) .
         OPTIONAL{?item wdt:P213 ?isni}.
         OPTIONAL{?item wdt:P496 ?orcid}.
-        # VALUES ?nkcr {'xx0226992' 'xx0137101' 'xx0136031' 'xx0277028'}
+        # VALUES ?nkcr {'test123' 'xx0313436' 'xx0313312' 'uk20241216330'}
     } LIMIT """ + str(limit) + """ OFFSET """ + str(offset) + """
     """
 
@@ -202,6 +240,8 @@ def get_all_non_deprecated_items(limit: Union[int, None] = None, offset: Union[i
     except rapidjson.JSONDecodeError:
         return non_deprecated_dictionary
     except pywikibot.exceptions.ServerError:
+        return non_deprecated_dictionary
+    except requests.exceptions.ConnectionError:
         return non_deprecated_dictionary
 
     # non_deprecated_dictionary_cache = []
@@ -245,15 +285,14 @@ def get_all_non_deprecated_items(limit: Union[int, None] = None, offset: Union[i
     return non_deprecated_dictionary
 
 
-def get_all_non_deprecated_items_occupation(limit: Union[int, None] = None, offset: Union[int, None] = None) -> dict[
-    dict[str, list, list]]:
+def get_all_non_deprecated_items_occupation(limit: Union[int, None] = None, offset: Union[int, None] = None) -> dict[dict[str, list, list]]:
     non_deprecated_dictionary: dict[dict[str, list, list]] = {}
 
     query = """
     select ?item ?nkcr ?occup where {
         ?item p:P691 [ps:P691 ?nkcr ; wikibase:rank ?rank ] filter(?rank != wikibase:DeprecatedRank) .
         OPTIONAL{?item wdt:P106 ?occup}.
-        # VALUES ?nkcr {'xx0226992' 'xx0137101' 'xx0136031' 'xx0277028'}
+        # VALUES ?nkcr {'test123' 'xx0313436' 'xx0313312' 'uk20241216330'}
         
     } LIMIT """ + str(limit) + """ OFFSET """ + str(offset) + """
     """
@@ -271,13 +310,15 @@ def get_all_non_deprecated_items_occupation(limit: Union[int, None] = None, offs
         return non_deprecated_dictionary
     except pywikibot.exceptions.ServerError:
         return non_deprecated_dictionary
+    except requests.exceptions.ConnectionError:
+        return non_deprecated_dictionary
 
     if type(data_non_deprecated) is None:
         return non_deprecated_dictionary
 
     # non_deprecated_dictionary_cache = []
     item_non_deprecated: dict[str, Union[
-        pywikibot.data.sparql.URI, pywikibot.data.sparql.Literal, Union[pywikibot.data.sparql.Literal, None], Union[
+        str, pywikibot.data.sparql.Literal, Union[pywikibot.data.sparql.Literal, None], Union[
             pywikibot.data.sparql.Literal, None]]]
     for item_non_deprecated in data_non_deprecated:
         if item_non_deprecated['occup'] is not None:
@@ -303,8 +344,7 @@ def get_all_non_deprecated_items_occupation(limit: Union[int, None] = None, offs
     return non_deprecated_dictionary
 
 
-def get_all_non_deprecated_items_field_of_work_and_occupation(limit: Union[int, None] = None, offset: Union[int, None] = None) -> dict[
-    dict[str, list, list]]:
+def get_all_non_deprecated_items_field_of_work_and_occupation(limit: Union[int, None] = None, offset: Union[int, None] = None) -> dict[dict[str, list, list]]:
     non_deprecated_dictionary: dict[dict[str, list, list]] = {}
 
     query = """
@@ -312,7 +352,7 @@ def get_all_non_deprecated_items_field_of_work_and_occupation(limit: Union[int, 
         ?item p:P691 [ps:P691 ?nkcr ; wikibase:rank ?rank ] filter(?rank != wikibase:DeprecatedRank) .
         OPTIONAL{?item wdt:P101 ?field}.
         OPTIONAL{?item wdt:P106 ?occup}.
-       #  VALUES ?nkcr {'xx0226992' 'xx0137101' 'xx0136031' 'xx0277028'}
+       # VALUES ?nkcr {'test123' 'xx0313436' 'xx0313312' 'uk20241216330'}
 
     } LIMIT """ + str(limit) + """ OFFSET """ + str(offset) + """
     """
@@ -328,6 +368,8 @@ def get_all_non_deprecated_items_field_of_work_and_occupation(limit: Union[int, 
     except rapidjson.JSONDecodeError:
         return non_deprecated_dictionary
     except pywikibot.exceptions.ServerError:
+        return non_deprecated_dictionary
+    except requests.exceptions.ConnectionError:
         return non_deprecated_dictionary
 
     if type(data_non_deprecated) is None:
@@ -373,8 +415,8 @@ def get_all_non_deprecated_items_field_of_work_and_occupation(limit: Union[int, 
     del data_non_deprecated
     return non_deprecated_dictionary
 
-def get_all_non_deprecated_items_places(limit: Union[int, None] = None, offset: Union[int, None] = None) -> dict[
-    dict[str, list, list]]:
+
+def get_all_non_deprecated_items_places(limit: Union[int, None] = None, offset: Union[int, None] = None) -> dict[dict[str, list, list]]:
     non_deprecated_dictionary: dict[dict[str, list, list]] = {}
 
     query = """
@@ -383,7 +425,7 @@ def get_all_non_deprecated_items_places(limit: Union[int, None] = None, offset: 
         OPTIONAL{?item wdt:P19 ?birth}.
         OPTIONAL{?item wdt:P20 ?death}.
         OPTIONAL{?item wdt:P937 ?work}.
-       #  VALUES ?nkcr {'xx0226992' 'xx0137101' 'xx0136031' 'xx0277028'}
+       # VALUES ?nkcr {'test123' 'xx0313436' 'xx0313312' 'uk20241216330'}
     }  LIMIT """ + str(limit) + """ OFFSET """ + str(offset) + """
     """
     # if (limit is not None):
@@ -398,6 +440,8 @@ def get_all_non_deprecated_items_places(limit: Union[int, None] = None, offset: 
     except rapidjson.JSONDecodeError:
         return non_deprecated_dictionary
     except pywikibot.exceptions.ServerError:
+        return non_deprecated_dictionary
+    except requests.exceptions.ConnectionError:
         return non_deprecated_dictionary
 
     if type(data_non_deprecated) is None:
@@ -493,6 +537,21 @@ def get_claim_from_item_by_property(datas: dict[str, Any], property_of_item: str
     return claims_from_data
 
 
+def get_claim_from_item_by_property_wbi(datas: ItemEntity, property_of_item: str) -> list:
+    claims_from_data = []
+    try:
+        claims_by_property = datas.claims.get(property_of_item)
+    except KeyError:
+        return []
+    for claim in claims_by_property:
+        if claim.mainsnak.datatype == WikibaseDatatype.EXTERNALID.value:
+            claims_from_data.append(claim.mainsnak.datavalue['value'])
+        else:
+            claims_from_data.append(claim.mainsnak.datavalue['value']['id'])
+
+    return claims_from_data
+
+
 def is_item_subclass_of(item: pywikibot.ItemPage, subclass: pywikibot.ItemPage):
     query = """
     select ?item where  {
@@ -510,34 +569,85 @@ def is_item_subclass_of(item: pywikibot.ItemPage, subclass: pywikibot.ItemPage):
         return True
 
 
+def is_item_subclass_of_wbi(item_qid: str, subclass_qid: str):
+    query_first = """
+        select ?item where  {
+            values ?item {wd:""" + item_qid + """}
+            {?item wdt:P31/wdt:P279 wd:""" + subclass_qid + """ .} union 
+            {?item wdt:P31/wdt:P279/wdt:P279 wd:""" + subclass_qid + """ .} union 
+            {?item wdt:P31/wdt:P279/wdt:P279/wdt:P279 wd:""" + subclass_qid + """ .} union
+            {?item wdt:P31/wdt:P279/wdt:P279/wdt:P279/wdt:P279 wd:""" + subclass_qid + """ .}
+            {?item wdt:P31/wdt:P279/wdt:P279/wdt:P279/wdt:P279/wdt:P279 wd:""" + subclass_qid + """ .}
+            {?item wdt:P31/wdt:P279/wdt:P279/wdt:P279/wdt:P279/wdt:P279/wdt:P279 wd:""" + subclass_qid + """ .}
+        }
+    """
+
+    data_first = wbi_helpers.execute_sparql_query(query=query_first)
+
+    if len(data_first['results']['bindings']) == 0:
+        # not subclass of
+        return False
+    else:
+        return True
+
+    # if len(data_first['results']['bindings']) == 0:
+    #     # not subclass of - maybe
+    #     query = """
+    #         select ?item where  {
+    #             values ?item {wd:""" + item_qid + """}
+    #             ?item wdt:P279*/wdt:P31 wd:""" + subclass_qid + """ .
+    #         }
+    #         """
+    #
+    #     data_is_subclass = wbi_helpers.execute_sparql_query(query=query)
+    #     # data_is_subclass = query_object.select(query=query, full_data=False)
+    #     if len(data_is_subclass['results']['bindings']) == 0:
+    #         # not subclass of
+    #         return False
+    #     else:
+    #         return True
+    # else:
+    #     return True
+
+
 def log_with_date_time(message: str = ''):
-    datetime_object = datetime.now()
-    formatted_time = datetime_object.strftime("%H:%M:%S")
-    print(formatted_time + ": " + message)
+    log.info(message)
 
 
-def load_sparql_query_by_chunks(limit: int, get_method):
-    i = 0
-    run = True
-    final_data = {}
-    while run:
-        lim = limit
+def load_sparql_query_by_chunks(limit: int, get_method, name: str):
+    if Config.use_json_database:
+        if os.path.isfile(name + '.json'):
+            infile = open(name + '.json')
+            data = simplejson.load(infile)
+            return data
+    if not os.path.isfile(name + '.json') or Config.debug == False:
+        i = 0
+        run = True
+        final_data = {}
+        while run:
+            lim = limit
 
-        offset = i * limit
-        if i % 3 == 0:
-            log_with_date_time(get_method.__name__ + ": " + str(offset))
-        data = get_method(lim, offset)
-        gc.collect()
-        if len(final_data) == 0:
-            final_data = data
-        else:
-            final_data.update(data)
-        if len(data) == 0:
-            run = False
-        i = i + 1
+            offset = i * limit
+            if i % 3 == 0:
+                log_with_date_time(get_method.__name__ + ": " + str(offset))
+            data = get_method(lim, offset)
+            gc.collect()
+            if len(final_data) == 0:
+                final_data = data
+            else:
+                final_data.update(data)
+            if len(data) == 0:
+                run = False
+            i = i + 1
 
-    data = final_data
-    return data
+        data = final_data
+
+        json_object = simplejson.dumps(data)
+
+        with open(name + '.json', "w") as outfile:
+            outfile.write(json_object)
+        return data
+
 
 def load_language_dict_csv() -> dict:
     filename = download_language_dict_csv()
@@ -554,7 +664,6 @@ def load_language_dict_csv() -> dict:
 
 def download_language_dict_csv() -> str:
     url = "https://raw.githubusercontent.com/wmcz/WMCZ-scripts/main/jazyky.csv"
-    # print(url)
     filename = 'jazyky.csv'
 
     try:
@@ -569,6 +678,7 @@ def download_language_dict_csv() -> str:
 
     return filename
 
+
 def get_all_non_deprecated_items_languages(limit: Union[int, None] = None, offset: Union[int, None] = None) -> dict[
     dict[str, list, list]]:
     non_deprecated_dictionary: dict[dict[str, list, list]] = {}
@@ -577,7 +687,7 @@ def get_all_non_deprecated_items_languages(limit: Union[int, None] = None, offse
     select  ?item ?nkcr ?language where {
         ?item p:P691 [ps:P691 ?nkcr ; wikibase:rank ?rank ] filter(?rank != wikibase:DeprecatedRank) .
         OPTIONAL{?item wdt:P1412 ?language}.
-        # VALUES ?nkcr {'xx0226992' 'xx0137101' 'xx0136031' 'xx0277028'}
+        # VALUES ?nkcr {'test123' 'xx0313436' 'xx0313312' 'uk20241216330'}
     }  LIMIT """ + str(limit) + """ OFFSET """ + str(offset) + """
     """
     query_object = mySparql.MySparqlQuery()
@@ -618,3 +728,8 @@ def get_all_non_deprecated_items_languages(limit: Union[int, None] = None, offse
             }
     del data_non_deprecated
     return non_deprecated_dictionary
+
+def get_bot_password(filename):
+    with open(filename, 'r') as file:
+        first_line = file.readline()
+    return first_line

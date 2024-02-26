@@ -3,3 +3,13 @@
 /cache.csv
 /throttle.ctrl
 /apicache-py3
+/__pycache__
+/bot_password
+/catmandu.log
+/debug.csv
+/non_deprecated_items.json
+/occupations.json
+/places.json
+/languages.json
+/field_of_work_and_occupation.json
+/jazyky.csv

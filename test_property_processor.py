@@ -1,53 +1,46 @@
-import pywikibot
 import pytest
-from config import *
-from property_processor import *
-from pywikibot_extension import MyDataSite
+from wikibaseintegrator import wbi_login, WikibaseIntegrator
+from wikibaseintegrator.wbi_config import config as wbi_config
+
+from cleaners import prepare_column_of_content
+from property_processor.property_processor_374a import PropertyProcessor374a
+from property_processor.property_processor_one import PropertyProcessorOne
 from tools import *
 
-
+wbi_config['USER_AGENT'] = 'Frettiebot/1.0 (https://www.wikidata.org/wiki/User:Frettiebot)'
+login_instance = wbi_login.Login(user='Frettiebot', password='wikibaseintegrator@g3roop93tdhq0gdvku1d079j2pd51ah5')
+wbi = WikibaseIntegrator(login=login_instance, is_bot=True)
 @pytest.mark.parametrize(
     "qid,property_for_new_field,column,value,aut",
     [
-        ('Q555628', 'P213', '0247a-isni', '1234 5678 9012 3456', 'jn19990009817'),
-        ('Q555628', 'P213', '0247a-isni', '0000 0001 1466 7884', 'jn19990009817'),
-        ('Q555628', 'P213', '0247a-orcid', '1234567890', 'jn19990009817'),
+        ('Q555628', 'P213', '0247a-isni', '1234567890123456', 'jn19990009817'),
+        ('Q555628', 'P213', '0247a-isni', '0000000114667884', 'jn19990009817'),
+        ('Q555628', 'P496', '0247a-orcid', '0000-0002-1825-0097', 'jn19990009817'),
     ],
 )
 def test_process_one(qid, property_for_new_field, column, value, aut):
-    repo = MyDataSite('wikidata', 'wikidata', user=Config.user_name)
-
-    item_new_field = pywikibot.ItemPage(repo, qid)
-    datas_from_wd = item_new_field.get(get_redirect=True)
-    claim_direct_from_wd = get_claim_from_item_by_property(datas_from_wd,
+    item_new_field = wbi.item.get(qid)
+    claim_direct_from_wd = get_claim_from_item_by_property_wbi(item_new_field,
                                                            property_for_new_field)
     row_new_fields = {
         column: value,
         '_id': aut
     }
-
-    reset_debug_file()
-
-    property_processor = PropertyProcessorOne()
-    property_processor.set_repo(repo)
-    property_processor.set_debug(True)
-    property_processor.set_claim_direct_from_wd(claim_direct_from_wd)
-    property_processor.set_property_for_new_field(property_for_new_field)
-    property_processor.set_column(column)
-    property_processor.set_item_new_field(item_new_field)
-    property_processor.set_row_new_fields(row_new_fields)
+    row_new_fields[column] = prepare_column_of_content(column, row_new_fields)
+    property_processor = PropertyProcessorOne(wbi=wbi,
+                                              property_for_new_field=property_for_new_field, column=column,
+                                              row_new_fields=row_new_fields, claim_direct_from_wd=claim_direct_from_wd,
+                                              item_new_field=item_new_field)
     property_processor.process()
 
-    reader = read_log()
-    for line in reader:
-        # print(line)
-        if line['value'] != value:
-            assert False
-        if line['prop'] != property_for_new_field:
-            assert False
-        if line['item'] != qid:
-            assert False
-        assert True
+    claims_final = property_processor.item_new_field.claims.get(property_for_new_field)
+
+    result = False
+    for claim in claims_final:
+        if (claim.mainsnak.datavalue['value'] == value):
+            result = True
+
+    assert result
 
 
 @pytest.mark.parametrize(
@@ -60,11 +53,8 @@ def test_process_one(qid, property_for_new_field, column, value, aut):
     ],
 )
 def test_process_occupation(qid, property_for_new_field, column, value, aut):
-    repo = MyDataSite('wikidata', 'wikidata', user=Config.user_name)
-
-    item_new_field = pywikibot.ItemPage(repo, qid)
-    datas_from_wd = item_new_field.get(get_redirect=True)
-    claim_direct_from_wd = get_claim_from_item_by_property(datas_from_wd,
+    item_new_field = wbi.item.get(qid)
+    claim_direct_from_wd = get_claim_from_item_by_property_wbi(item_new_field,
                                                            property_for_new_field)
 
     row_new_fields = {
@@ -72,25 +62,15 @@ def test_process_occupation(qid, property_for_new_field, column, value, aut):
         '_id': aut
     }
 
-    reset_debug_file()
-
-    property_processor = PropertyProcessor374a()
-    property_processor.set_repo(repo)
-    property_processor.set_debug(True)
-    property_processor.set_claim_direct_from_wd(claim_direct_from_wd)
-    property_processor.set_property_for_new_field(property_for_new_field)
-    property_processor.set_column(column)
-    property_processor.set_item_new_field(item_new_field)
-    property_processor.set_row_new_fields(row_new_fields)
+    property_processor = PropertyProcessor374a(wbi=wbi, property_for_new_field=property_for_new_field, column=column, row_new_fields=row_new_fields, claim_direct_from_wd=claim_direct_from_wd, item_new_field=item_new_field)
     property_processor.process()
 
-    reader = read_log()
-    for line in reader:
-        # print(line)
-        if line['value'] not in value:
-            assert False
-        if line['prop'] != property_for_new_field:
-            assert False
-        if line['item'] != qid:
-            assert False
-        assert True
+    claims_final = property_processor.item_new_field.claims.get(property_for_new_field)
+
+    result = False
+    for claim in claims_final:
+        if (claim.mainsnak.datavalue['value']['id'] in value):
+            result = True
+
+    assert result
+

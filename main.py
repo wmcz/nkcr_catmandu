@@ -1,35 +1,52 @@
 import argparse
-import configparser
 import time
+import timeit
 
-import requests
+from wikibaseintegrator.wbi_exceptions import MissingEntityException
 
+import config
 from cleaners import clean_qid
-from config import *
-# from logger import Logger
 from nkcr_exceptions import BadItemException
 from processor import Processor
-from pywikibot_extension import MyDataSite
 from sources import Loader
 from tools import *
+
+from wikibaseintegrator.wbi_config import config as wbi_config
+from wikibaseintegrator import WikibaseIntegrator, wbi_login
+
+log = logging.getLogger(__name__)
 
 parser = argparse.ArgumentParser(description='NKČR catmandu pipeline.')
 parser.add_argument('-i', '--input', help='NKČR CSV file name', required=True)
 args = parser.parse_args()
 
-print("Input file: %s" % args.input)
 file_name = args.input
 
+logging.basicConfig(level=logging.INFO,
+                    format='%(levelname)s:%(module)s:%(asctime)s:%(message)s',
+                    filename='catmandu.log',
+                    filemode='a')
+
+console = logging.StreamHandler()
+console.setLevel(logging.INFO)
+formatter = logging.Formatter('%(levelname)s:%(module)s:%(asctime)s:%(message)s')
+console.setFormatter(formatter)
+logging.getLogger().addHandler(console)
+
+log.info("Input file: %s" % args.input)
+
+print_info(config.Config.debug)
+gc.enable()
+
+bot_password = get_bot_password('bot_password')
+
+wbi_config['USER_AGENT'] = 'Frettiebot/1.0 (https://www.wikidata.org/wiki/User:Frettiebot)'
+login_instance = wbi_login.Login(user='Frettiebot', password=bot_password)
+wbi = WikibaseIntegrator(login=login_instance, is_bot=True)
 
 if __name__ == '__main__':
-    print_info(Config.debug)
-    gc.enable()
-
-    repo = MyDataSite('wikidata', 'wikidata', user=Config.user_name)
 
     processor = Processor()
-    processor.set_repo(repo)
-    processor.set_debug(Config.debug)
 
     loader = Loader()
     loader.set_file_name(file_name)
@@ -39,6 +56,7 @@ if __name__ == '__main__':
     write_log(head, True)
 
     count = 0
+    inserts = 0
 
     for chunk in loader.chunks:
         chunk.fillna('', inplace=True)
@@ -52,54 +70,81 @@ if __name__ == '__main__':
                 log_with_date_time('line: ' + str(count))
 
             if (count % 1000) == 0:
-                log_with_date_time('line ' + str(count) + ' - ' + nkcr_aut)
+                log_with_date_time('line: ' + str(count) + ' - ' + nkcr_aut)
 
             item = None
 
             try:
                 qid = row['0247a-wikidata']
-                if qid != '':  # raději bych none, ale to tady nejde ... pandas, no
+                if qid != '':
                     name = row['100a']
 
                     qid = clean_qid(qid)
-                    item = pywikibot.ItemPage(repo, qid)
 
                     try:
                         nkcr_auts = loader.qid_to_nkcr.get(qid, [])
                         if nkcr_aut not in nkcr_auts:
-                            datas = item.get(get_redirect=True)
-                            instances_from_item = get_claim_from_item_by_property(datas, 'P31')
+                            item = wbi.item.get(qid)
+                            datas = item
+                            instances_from_item = get_claim_from_item_by_property_wbi(datas, 'P31')
                             for instance_from_item in instances_from_item:
-                                if instance_from_item.getID() in Config.instances_not_possible_for_nkcr:
+                                # if instance_from_item.getID() in Config.instances_not_possible_for_nkcr: #pywikibot
+                                if instance_from_item in Config.instances_not_possible_for_nkcr:
                                     save = False
-                                    raise ValueError('Nepovolená instance položky: ' + str(instance_from_item.getID()))
-                            nkcr_auts_from_wd = get_nkcr_auts_from_item(datas)
+                                    raise ValueError('Nepovolená instance položky: ' + instance_from_item)
+
+                                if qid in Config.qid_blacklist:
+                                    save = False
+                                    lab = item.labels.get('cs')
+                                    if lab is None:
+                                        lab = item.labels.get('en')
+                                        if lab is None:
+                                            lab = "label not in cz and en"
+                                    raise ValueError('Blacklistovaná položka: ' + qid + ' – ' + lab.value)
+                            # nkcr_auts_from_wd = get_nkcr_auts_from_item(datas)
+                            nkcr_auts_from_wd = get_nkcr_auts_from_item_wbi(datas)
                             if nkcr_aut not in nkcr_auts_from_wd:
                                 try:
-                                    if item.isRedirectPage():
-                                        item = item.getRedirectTarget()
-                                        item.get(get_redirect=True)
+                                    # if item.isRedirectPage():
+                                    #     item = item.getRedirectTarget()
+                                    #     item.get(get_redirect=True)
                                     if save:
-                                        add_nkcr_aut_to_item(Config.debug, repo, item, nkcr_aut, name)
+                                        # add_nkcr_aut_to_item(Config.debug, repo, item, nkcr_aut, name)
+                                        item = add_nkcr_aut_to_item_wbi(item, nkcr_aut, name)
 
                                     loader.non_deprecated_items[nkcr_aut] = {
                                         'qid': qid,
                                         'isni': [],
                                         'orcid': []
                                     }
-                                except pywikibot.exceptions.OtherPageSaveError as e:
-                                    log_with_date_time(str(e))
+                                    loader.non_deprecated_items_field_of_work_and_occupation[nkcr_aut] = {
+                                        'qid': qid,
+                                        'field': [],
+                                        'occup': []
+                                    }
+                                    loader.non_deprecated_items_places[nkcr_aut] = {
+                                        'qid': qid,
+                                        'birth': [],
+                                        'death': [],
+                                        'work': [],
+                                    }
+                                    loader.non_deprecated_items_languages[nkcr_aut] = {
+                                        'qid': qid,
+                                        'language': [],
+                                    }
                                 except ValueError as e:
-                                    log_with_date_time(str(e))
+                                    log.error(str(e))
                     except KeyError as e:
-                        log_with_date_time('key err')
+                        log.warning('key err:' + str(e))
                     except ValueError as e:
-                        log_with_date_time(str(e))
+                        log.error(str(e))
                 ms = time.time()
                 # print(ms)
                 if save:
                     processor.set_nkcr_aut(nkcr_aut)
                     processor.set_qid(qid)
+                    processor.set_wbi(wbi)
+                    processor.reset_instances_from_item(None)
                     if item is not None:
                         processor.set_item(item)
                     else:
@@ -123,6 +168,7 @@ if __name__ == '__main__':
                     properties = {
                         '377a': 'P1412',
                     }
+
                     processor.set_enabled_columns(properties)
                     processor.process_occupation_type(loader.non_deprecated_items_languages)
 
@@ -133,15 +179,33 @@ if __name__ == '__main__':
                     }
                     processor.set_enabled_columns(properties)
                     processor.process_occupation_type(loader.non_deprecated_items_places)
+
+                    if processor.item is not None and Config.debug is not True:
+                        changed = False
+                        for prop in Config.properties.values():
+                            try:
+                                values = processor.get_item().claims.get(prop)
+                                for value in values:
+                                    id = value.id
+                                    if (id is None):
+                                       changed = True
+                            except KeyError as e:
+                                pass
+
+                        if changed:
+                            inserts = inserts + 1
+                            if inserts % 10 == 0:
+                                log_with_date_time('inserted: ' + str(inserts))
+                            processor.item.write(
+                                summary="Update NK ČR",
+                                is_bot=True,
+                                retry_after=10,
+                                tags=['Czech-Authorities-Sync'])
             except BadItemException as e:
-                log_with_date_time(str(e))
-            except pywikibot.exceptions.NoPageError as e:
-                log_with_date_time(str(e))
+                log.error(str(e))
+            except MissingEntityException as e:
+                log.error(str(e))
             except requests.exceptions.ConnectionError as e:
-                log_with_date_time(str(e))
-            except pywikibot.exceptions.APIError as e:
-                log_with_date_time(str(e))
-            except pywikibot.exceptions.InvalidTitleError as e:
-                log_with_date_time(str(e))
+                log.error(str(e))
 
             # logger.logComplete(nkcr_aut)
