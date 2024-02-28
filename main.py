@@ -192,7 +192,7 @@ if __name__ == '__main__':
                         #     except KeyError as e:
                         #         pass
 
-                        changet = True
+                        changed = True
 
                         if changed:
                             inserts = inserts + 1
