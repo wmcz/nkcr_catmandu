@@ -182,18 +182,16 @@ if __name__ == '__main__':
                     processor.process_occupation_type(loader.non_deprecated_items_places)
 
                     if processor.item is not None and Config.debug is not True:
-                        # changed = False
-                        # for prop in Config.properties.values():
-                        #     try:
-                        #         values = processor.get_item().claims.get(prop)
-                        #         for value in values:
-                        #             id = value.id
-                        #             if (id is None):
-                        #                changed = True
-                        #     except KeyError as e:
-                        #         pass
-
-                        changed = True
+                        changed = False
+                        for prop in Config.properties.values():
+                            try:
+                                values = processor.get_item().claims.get(prop)
+                                for value in values:
+                                    id = value.id
+                                    if (id is None):
+                                       changed = True
+                            except KeyError as e:
+                                pass
 
                         if changed:
                             inserts = inserts + 1
