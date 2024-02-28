@@ -2,7 +2,8 @@ import argparse
 import time
 import timeit
 
-from wikibaseintegrator.wbi_exceptions import MissingEntityException
+from wikibaseintegrator.wbi_exceptions import MissingEntityException, MWApiError, ModificationFailed, SaveFailed, \
+    NonExistentEntityError, MaxRetriesReachedException
 
 import config
 from cleaners import clean_qid
@@ -209,5 +210,21 @@ if __name__ == '__main__':
                 log.error(str(e))
             except requests.exceptions.ConnectionError as e:
                 log.error(str(e))
+            except SaveFailed as e:
+                log.error(str(e))
+            except NonExistentEntityError as e:
+                log.error(str(e))
+            except ModificationFailed as e:
+                log.error(str(e))
+            except MaxRetriesReachedException as e:
+                log.error(str(e))
+            except MWApiError as e:
+                log.error(str(e))
+
+
+
+
+
+
 
             # logger.logComplete(nkcr_aut)
