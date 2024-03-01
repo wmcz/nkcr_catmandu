@@ -7,6 +7,8 @@ from nkcr_exceptions import BadItemException
 name_to_nkcr: dict = {}
 language_dict: dict = {}
 
+cachedData = {}
+
 log = logging.getLogger(__name__)
 
 

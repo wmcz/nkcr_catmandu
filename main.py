@@ -63,6 +63,7 @@ if __name__ == '__main__':
         chunk.fillna('', inplace=True)
         chunk = chunk[chunk['100a'] != '']
         for row in chunk.to_dict('records'):
+            time_start = time.time()
             nkcr_aut = row['_id']
             save = True
             count = count + 1
@@ -86,6 +87,8 @@ if __name__ == '__main__':
                         nkcr_auts = loader.qid_to_nkcr.get(qid, [])
                         if nkcr_aut not in nkcr_auts:
                             item = wbi.item.get(qid)
+                            time_load_item = time.time()
+                            # log_with_date_time('time_from_start_to_load_item:' + str(time_load_item-time_start))
                             datas = item
                             instances_from_item = get_claim_from_item_by_property_wbi(datas, 'P31')
                             for instance_from_item in instances_from_item:
@@ -142,6 +145,8 @@ if __name__ == '__main__':
                 ms = time.time()
                 # print(ms)
                 if save:
+                    time_process = time.time()
+                    # log_with_date_time('time_from_start_to_process_start:' + str(time_process - time_start))
                     processor.set_nkcr_aut(nkcr_aut)
                     processor.set_qid(qid)
                     processor.set_wbi(wbi)
@@ -180,9 +185,15 @@ if __name__ == '__main__':
                     }
                     processor.set_enabled_columns(properties)
                     processor.process_occupation_type(loader.non_deprecated_items_places)
-
+                    time_process_after = time.time()
+                    if (time_process_after - time_start > 1):
+                        log_with_date_time('time_from_start_to_process_after:' + str(time_process_after - time_start))
+                        log_with_date_time('long AUT:' + nkcr_aut)
+                    # if processor.item is None:
+                    #     log_with_date_time('non item AUT:' + nkcr_aut)
                     if processor.item is not None and Config.debug is not True:
                         changed = False
+
                         for prop in Config.properties.values():
                             try:
                                 values = processor.get_item().claims.get(prop)
@@ -193,6 +204,8 @@ if __name__ == '__main__':
                             except KeyError as e:
                                 pass
 
+                        time_after_save = time.time()
+                        # log_with_date_time('time_from_start_to_save_item:' + str(time_after_save - time_start))
                         if changed:
                             inserts = inserts + 1
                             # if inserts % 10 == 0:

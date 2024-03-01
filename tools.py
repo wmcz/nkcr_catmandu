@@ -17,6 +17,7 @@ from wikibaseintegrator.datatypes import Item, ExternalID, Time, String
 from wikibaseintegrator.entities import ItemEntity
 from wikibaseintegrator.wbi_enums import WikibaseDatePrecision, WikibaseDatatype, ActionIfExists
 
+import cleaners
 import mySparql
 import pywikibot_extension
 from cleaners import clean_last_comma
@@ -570,6 +571,11 @@ def is_item_subclass_of(item: pywikibot.ItemPage, subclass: pywikibot.ItemPage):
 
 
 def is_item_subclass_of_wbi(item_qid: str, subclass_qid: str):
+    try:
+        cached = cleaners.cachedData[subclass_qid][item_qid]
+        return cached
+    except KeyError as e:
+        pass
     query_first = """
         select ?item where  {
             values ?item {wd:""" + item_qid + """}
@@ -586,8 +592,18 @@ def is_item_subclass_of_wbi(item_qid: str, subclass_qid: str):
 
     if len(data_first['results']['bindings']) == 0:
         # not subclass of
+        if cleaners.cachedData.get(subclass_qid, False):
+            cleaners.cachedData[subclass_qid][item_qid] = False
+        else:
+            cleaners.cachedData[subclass_qid] = {}
+            cleaners.cachedData[subclass_qid][item_qid] = False
         return False
     else:
+        if cleaners.cachedData.get(subclass_qid, False):
+            cleaners.cachedData[subclass_qid][item_qid] = True
+        else:
+            cleaners.cachedData[subclass_qid] = {}
+
         return True
 
     # if len(data_first['results']['bindings']) == 0:
