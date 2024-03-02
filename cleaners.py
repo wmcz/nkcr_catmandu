@@ -61,9 +61,9 @@ def prepare_occupation_from_nkcr(occupation_string: str) -> Union[str, list]:
                 if occupation in nkcr_to_qid:
                     occupations.append(nkcr_to_qid[occupation])
                 else:
-                    log.warning('key_err: ' + occupation)
+                    log.warning('not found occupation: ' + occupation)
         except KeyError as e:
-            log.warning('key_err: ' + str(e))
+            log.warning('not found occupation: ' + str(e))
         # for occupation in splitted_occupations:
         #     try:
         #         occupation_qid = nkcr_to_qid[occupation]
@@ -89,9 +89,9 @@ def prepare_language_from_nkcr(language_string: str) -> Union[str, list]:
                 if language in nkcr_to_qid:
                     languages.append(nkcr_to_qid[language])
                 else:
-                    log.warning('key_err: ' + language)
+                    log.warning('not found language: ' + language)
         except KeyError as e:
-            log.info('key_err: ' + str(e))
+            log.warning('not found language: ' + str(e))
         # for occupation in splitted_occupations:
         #     try:
         #         occupation_qid = nkcr_to_qid[occupation]
@@ -133,9 +133,9 @@ def prepare_places_from_nkcr(place_string: str) -> Union[str, list]:
                 if corrected_place in nkcr_to_qid:
                     places.append(nkcr_to_qid[corrected_place])
                 else:
-                    log.warning('key_err: ' + corrected_place)
+                    log.warning('not found place: ' + corrected_place)
         except KeyError as e:
-            log.warning('key_err: ' + str(e))
+            log.warning('not found place: ' + str(e))
         # for occupation in splitted_occupations:
         #     try:
         #         occupation_qid = nkcr_to_qid[occupation]
