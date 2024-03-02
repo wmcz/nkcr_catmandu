@@ -5,7 +5,9 @@ import timeit
 from wikibaseintegrator.wbi_exceptions import MissingEntityException, MWApiError, ModificationFailed, SaveFailed, \
     NonExistentEntityError, MaxRetriesReachedException
 
+import cleaners
 import config
+import tools
 from cleaners import clean_qid
 from nkcr_exceptions import BadItemException
 from processor import Processor
@@ -192,17 +194,26 @@ if __name__ == '__main__':
                     # if processor.item is None:
                     #     log_with_date_time('non item AUT:' + nkcr_aut)
                     if processor.item is not None and Config.debug is not True:
+                        change_text_array = []
                         changed = False
+                        if (processor.get_item().labels.get('cs') is None) and len(row['100a']) > 0:
+                            whole_name = tools.first_name(row['100a']) + ' ' + tools.last_name(row['100a'])
+                            processor.get_item().labels.set('cs', whole_name, ActionIfExists.REPLACE_ALL)
+                            log_with_date_time('New CS label for ' + nkcr_aut + ' is ' + whole_name)
+                            changed = True
+                            change_text_array.append('cs label')
 
-                        for prop in Config.properties.values():
-                            try:
-                                values = processor.get_item().claims.get(prop)
-                                for value in values:
-                                    id = value.id
-                                    if (id is None):
-                                       changed = True
-                            except KeyError as e:
-                                pass
+                        if changed is not True:
+                            for prop in Config.properties.values():
+                                try:
+                                    values = processor.get_item().claims.get(prop)
+                                    for value in values:
+                                        id = value.id
+                                        if (id is None):
+                                            change_text_array.append(prop)
+                                            changed = True
+                                except KeyError as e:
+                                    pass
 
                         time_after_save = time.time()
                         # log_with_date_time('time_from_start_to_save_item:' + str(time_after_save - time_start))
@@ -211,7 +222,7 @@ if __name__ == '__main__':
                             # if inserts % 10 == 0:
                             #     log_with_date_time('inserted: ' + str(inserts))
                             processor.item.write(
-                                summary="Update NK ČR",
+                                summary="Update NK ČR – " + ', '.join(change_text_array),
                                 is_bot=True,
                                 retry_after=10,
                                 tags=['Czech-Authorities-Sync'])
@@ -234,7 +245,7 @@ if __name__ == '__main__':
 
 
 
-
+print(cleaners.cachedData)
 
 
 

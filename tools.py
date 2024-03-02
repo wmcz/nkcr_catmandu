@@ -749,3 +749,57 @@ def get_bot_password(filename):
     with open(filename, 'r') as file:
         first_line = file.readline()
     return first_line
+
+def first_name(name):
+    """
+            Returns the title of the record (245 $a an $b).
+            """
+    try:
+        assert isinstance(name, str)
+        splits = name.replace(',','').split(' ')
+        length = len(splits)
+        ret = splits[len(splits)-1]
+
+        import re
+        regex = r"(.*),\W+([\w‘ \.]*)(,*)"
+        matches = re.search(regex, name, re.IGNORECASE)
+        try:
+            groups = matches.groups()
+            name = groups[1]
+        except AttributeError as e:
+            name = ret
+        except ValueError as e:
+            name = ret
+    except TypeError:
+        name = None
+    except KeyError:
+        name = None
+
+    return name
+
+def last_name(name):
+    """
+            Returns the title of the record (245 $a an $b).
+            """
+    try:
+        assert isinstance(name, str)
+        splits = name.replace(',', '').split(' ')
+        length = len(splits)
+        ret = splits[0]
+
+        import re
+        regex = r"(.*),\W+([\w‘ \.]*)(,*)"
+        matches = re.search(regex, name, re.IGNORECASE)
+        try:
+            groups = matches.groups()
+            name = groups[0]
+        except AttributeError as e:
+            name = ret
+        except ValueError as e:
+            name = ret
+    except TypeError:
+        name = None
+    except KeyError:
+        name = None
+
+    return name
