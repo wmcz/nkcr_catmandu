@@ -1,7 +1,8 @@
 import argparse
+import logging
 import time
 import timeit
-from logging.handlers import TimedRotatingFileHandler
+from logging.handlers import TimedRotatingFileHandler, RotatingFileHandler
 
 from wikibaseintegrator.wbi_exceptions import MissingEntityException, MWApiError, ModificationFailed, SaveFailed, \
     NonExistentEntityError, MaxRetriesReachedException
@@ -26,24 +27,25 @@ args = parser.parse_args()
 
 file_name = args.input
 
-logging.basicConfig(level=logging.INFO,
-                    format='%(levelname)s:%(module)s:%(asctime)s:%(message)s',
-                    filename='catmandu.log',
-                    filemode='a')
+# logging.basicConfig(level=logging.INFO,
+#                     format='%(levelname)s:%(module)s:%(asctime)s:%(message)s',
+#                     filename='catmandu.log',
+#                     filemode='a')
+logging.basicConfig(
+        handlers=[RotatingFileHandler('catmandu.log',
+                               mode='a',
+                               maxBytes=1024*1024*10,
+                               backupCount=5)],
+        level=logging.INFO,
+        format='%(levelname)s:%(module)s:%(asctime)s:%(message)s',
+        )
 
-rotation_logging_handler = TimedRotatingFileHandler('catmandu.log',
-                               when='D',
-                               interval=5,
-                               backupCount=5)
 formatter = logging.Formatter('%(levelname)s:%(module)s:%(asctime)s:%(message)s')
-rotation_logging_handler.format(formatter)
-rotation_logging_handler.suffix = '%Y-%m-%d'
 console = logging.StreamHandler()
 console.setLevel(logging.INFO)
 
 console.setFormatter(formatter)
 logging.getLogger().addHandler(console)
-logging.getLogger().addHandler(rotation_logging_handler)
 
 log.info("Input file: %s" % args.input)
 
