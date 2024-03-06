@@ -200,11 +200,14 @@ def get_occupations(limit: Union[int, None] = None, offset: Union[int, None] = N
 
     try:
         data_occupation_wbi = wbi_helpers.execute_sparql_query(query=query)
-    except simplejson.errors.JSONDecodeError:
+    except simplejson.errors.JSONDecodeError as e:
+        log_with_date_time('get occupations JSONDecodeError: ' + str(e))
         return occupation_dictionary
-    except Exception:
+    except Exception as e:
+        log_with_date_time('get occupations Exception: ' + str(e))
         return occupation_dictionary
-    except requests.exceptions.ConnectionError:
+    except requests.exceptions.ConnectionError as e:
+        log_with_date_time('get occupations ConnectionError: ' + str(e))
         return occupation_dictionary
 
     for item_occupation in data_occupation_wbi['results']['bindings']:
@@ -236,13 +239,17 @@ def get_all_non_deprecated_items(limit: Union[int, None] = None, offset: Union[i
     query_object = mySparql.MySparqlQuery()
     try:
         data_non_deprecated = query_object.select(query=query, full_data=False)
-    except simplejson.errors.JSONDecodeError:
+    except simplejson.errors.JSONDecodeError as e:
+        log_with_date_time('get non deprecated items JSONDecodeError: ' + str(e))
         return non_deprecated_dictionary
-    except rapidjson.JSONDecodeError:
+    except rapidjson.JSONDecodeError as e:
+        log_with_date_time('get non deprecated items JSONDecodeError: ' + str(e))
         return non_deprecated_dictionary
-    except pywikibot.exceptions.ServerError:
+    except pywikibot.exceptions.ServerError as e:
+        log_with_date_time('get non deprecated items ServerError: ' + str(e))
         return non_deprecated_dictionary
-    except requests.exceptions.ConnectionError:
+    except requests.exceptions.ConnectionError as e:
+        log_with_date_time('get non deprecated items ConnectionError: ' + str(e))
         return non_deprecated_dictionary
 
     # non_deprecated_dictionary_cache = []
@@ -305,13 +312,17 @@ def get_all_non_deprecated_items_occupation(limit: Union[int, None] = None, offs
 
     try:
         data_non_deprecated = query_object.select(query=query, full_data=False)
-    except simplejson.errors.JSONDecodeError:
+    except simplejson.errors.JSONDecodeError as e:
+        log_with_date_time('get non deprecated items occupation JSONDecodeError: ' + str(e))
         return non_deprecated_dictionary
-    except rapidjson.JSONDecodeError:
+    except rapidjson.JSONDecodeError as e:
+        log_with_date_time('get non deprecated items occupation JSONDecodeError: ' + str(e))
         return non_deprecated_dictionary
-    except pywikibot.exceptions.ServerError:
+    except pywikibot.exceptions.ServerError as e:
+        log_with_date_time('get non deprecated items occupation ServerError: ' + str(e))
         return non_deprecated_dictionary
-    except requests.exceptions.ConnectionError:
+    except requests.exceptions.ConnectionError as e:
+        log_with_date_time('get non deprecated items occupation ConnectionError: ' + str(e))
         return non_deprecated_dictionary
 
     if type(data_non_deprecated) is None:
@@ -364,13 +375,17 @@ def get_all_non_deprecated_items_field_of_work_and_occupation(limit: Union[int, 
     query_object = mySparql.MySparqlQuery()
     try:
         data_non_deprecated = query_object.select(query=query, full_data=False)
-    except simplejson.errors.JSONDecodeError:
+    except simplejson.errors.JSONDecodeError as e:
+        log_with_date_time('get non deprecated items field of work and occupation JSONDecodeError: ' + str(e))
         return non_deprecated_dictionary
-    except rapidjson.JSONDecodeError:
+    except rapidjson.JSONDecodeError as e:
+        log_with_date_time('get non deprecated items field of work and occupation JSONDecodeError: ' + str(e))
         return non_deprecated_dictionary
-    except pywikibot.exceptions.ServerError:
+    except pywikibot.exceptions.ServerError as e:
+        log_with_date_time('get non deprecated items field of work and occupation ServerError: ' + str(e))
         return non_deprecated_dictionary
-    except requests.exceptions.ConnectionError:
+    except requests.exceptions.ConnectionError as e:
+        log_with_date_time('get non deprecated items field of work and occupation ConnectionError: ' + str(e))
         return non_deprecated_dictionary
 
     if type(data_non_deprecated) is None:
@@ -436,13 +451,17 @@ def get_all_non_deprecated_items_places(limit: Union[int, None] = None, offset: 
     query_object = mySparql.MySparqlQuery()
     try:
         data_non_deprecated = query_object.select(query=query, full_data=False)
-    except simplejson.errors.JSONDecodeError:
+    except simplejson.errors.JSONDecodeError as e:
+        log_with_date_time('get non deprecated items places JSONDecodeError: ' + str(e))
         return non_deprecated_dictionary
-    except rapidjson.JSONDecodeError:
+    except rapidjson.JSONDecodeError as e:
+        log_with_date_time('get non deprecated items places JSONDecodeError: ' + str(e))
         return non_deprecated_dictionary
-    except pywikibot.exceptions.ServerError:
+    except pywikibot.exceptions.ServerError as e:
+        log_with_date_time('get non deprecated items places ServerError: ' + str(e))
         return non_deprecated_dictionary
-    except requests.exceptions.ConnectionError:
+    except requests.exceptions.ConnectionError as e:
+        log_with_date_time('get non deprecated items places ConnectionError: ' + str(e))
         return non_deprecated_dictionary
 
     if type(data_non_deprecated) is None:
@@ -643,7 +662,9 @@ def load_sparql_query_by_chunks(limit: int, get_method, name: str):
         while run:
             lim = limit
 
-            offset = i * limit
+            offset = (i * limit)-1
+            if (offset < 0):
+                offset = 0
             if i % 3 == 0:
                 log_with_date_time(get_method.__name__ + ": " + str(offset))
             data = get_method(lim, offset)

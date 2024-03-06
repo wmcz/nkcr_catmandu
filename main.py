@@ -36,7 +36,7 @@ logging.basicConfig(
                                mode='a',
                                maxBytes=1024*1024*10,
                                backupCount=5)],
-        level=logging.INFO,
+        level=logging.DEBUG,
         format='%(levelname)s:%(module)s:%(asctime)s:%(message)s',
         )
 
