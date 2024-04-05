@@ -169,6 +169,10 @@ class Processor:
             exist_qid = non_deprecated_items[nkcr_aut]['qid']
             if exist_qid != '':
                 exist_qid = clean_qid(exist_qid)
+                if self.item is None:
+                    item_new_field = self.wbi.item.get(exist_qid)
+                    self.item = item_new_field
+                    item = self.item
                 if item is not None:
                     self.process_new_fields_wbi(exist_qid, non_deprecated_items[nkcr_aut], row, item)
                 else:
