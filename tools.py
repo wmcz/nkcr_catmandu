@@ -372,7 +372,8 @@ def get_all_non_deprecated_items_field_of_work_and_occupation(limit: Union[int, 
     #     query = query + ' LIMIT ' + str(limit)
 
     # query_object = sparql.SparqlQuery()
-    query_object = mySparql.MySparqlQuery()
+    query_object = mySparql.MySparqlQuery(endpoint="https://query-main.wikidata.org/sparql", entity_url='http://www.wikidata.org/entity/')
+    # query_object = mySparql.MySparqlQuery()
     try:
         data_non_deprecated = query_object.select(query=query, full_data=False)
     except simplejson.errors.JSONDecodeError as e:
@@ -596,13 +597,21 @@ def is_item_subclass_of_wbi(item_qid: str, subclass_qid: str):
     except KeyError as e:
         pass
     query_first = """
-        select ?item where  {
+        select distinct ?item where  {
             values ?item {wd:""" + item_qid + """}
+            
+            {?item wdt:P279 wd:""" + subclass_qid + """ .} union 
+            {?item wdt:P279/wdt:P279 wd:""" + subclass_qid + """ .} union 
+            {?item wdt:P279/wdt:P279/wdt:P279 wd:""" + subclass_qid + """ .} union
+            {?item wdt:P279/wdt:P279/wdt:P279/wdt:P279 wd:""" + subclass_qid + """ .} union
+            {?item wdt:P279/wdt:P279/wdt:P279/wdt:P279/wdt:P279 wd:""" + subclass_qid + """ .} union
+            {?item wdt:P279/wdt:P279/wdt:P279/wdt:P279/wdt:P279/wdt:P279 wd:""" + subclass_qid + """ .} union
+  
             {?item wdt:P31/wdt:P279 wd:""" + subclass_qid + """ .} union 
             {?item wdt:P31/wdt:P279/wdt:P279 wd:""" + subclass_qid + """ .} union 
             {?item wdt:P31/wdt:P279/wdt:P279/wdt:P279 wd:""" + subclass_qid + """ .} union
-            {?item wdt:P31/wdt:P279/wdt:P279/wdt:P279/wdt:P279 wd:""" + subclass_qid + """ .}
-            {?item wdt:P31/wdt:P279/wdt:P279/wdt:P279/wdt:P279/wdt:P279 wd:""" + subclass_qid + """ .}
+            {?item wdt:P31/wdt:P279/wdt:P279/wdt:P279/wdt:P279 wd:""" + subclass_qid + """ .} union
+            {?item wdt:P31/wdt:P279/wdt:P279/wdt:P279/wdt:P279/wdt:P279 wd:""" + subclass_qid + """ .} union
             {?item wdt:P31/wdt:P279/wdt:P279/wdt:P279/wdt:P279/wdt:P279/wdt:P279 wd:""" + subclass_qid + """ .}
         }
     """
