@@ -39,7 +39,7 @@ class Loader:
         self.non_deprecated_items_languages = load_sparql_query_by_chunks(self.limit, get_all_non_deprecated_items_languages, 'languages')
         log_with_date_time('non deprecated items languages used read, size: ' + str(len(self.non_deprecated_items_languages)))
 
-        limit_for_work_and_occupation = 1000000
+        limit_for_work_and_occupation = 100000
         self.non_deprecated_items_field_of_work_and_occupation = load_sparql_query_by_chunks(limit_for_work_and_occupation,
                                                                                              get_all_non_deprecated_items_field_of_work_and_occupation, 'field_of_work_and_occupation')
         log_with_date_time('non deprecated items field of work and occupation read, size: ' + str(len(self.non_deprecated_items_field_of_work_and_occupation)))
