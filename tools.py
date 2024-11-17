@@ -236,7 +236,9 @@ def get_all_non_deprecated_items(limit: Union[int, None] = None, offset: Union[i
     """
 
     # query_object = sparql.SparqlQuery()
-    query_object = mySparql.MySparqlQuery()
+    # query_object = mySparql.MySparqlQuery()
+    query_object = mySparql.MySparqlQuery(endpoint="https://query-main.wikidata.org/sparql",
+                                          entity_url='http://www.wikidata.org/entity/')
     try:
         data_non_deprecated = query_object.select(query=query, full_data=False)
     except simplejson.errors.JSONDecodeError as e:
@@ -308,7 +310,9 @@ def get_all_non_deprecated_items_occupation(limit: Union[int, None] = None, offs
     #     query = query + ' LIMIT ' + str(limit)
 
     # query_object = mySparql.MySparqlQuery()
-    query_object = mySparql.MySparqlQuery()
+    # query_object = mySparql.MySparqlQuery()
+    query_object = mySparql.MySparqlQuery(endpoint="https://query-main.wikidata.org/sparql",
+                                          entity_url='http://www.wikidata.org/entity/')
 
     try:
         data_non_deprecated = query_object.select(query=query, full_data=False)
@@ -449,7 +453,9 @@ def get_all_non_deprecated_items_places(limit: Union[int, None] = None, offset: 
     #     query = query + ' LIMIT ' + str(limit)
 
     # query_object = sparql.SparqlQuery()
-    query_object = mySparql.MySparqlQuery()
+    # query_object = mySparql.MySparqlQuery()
+    query_object = mySparql.MySparqlQuery(endpoint="https://query-main.wikidata.org/sparql",
+                                          entity_url='http://www.wikidata.org/entity/')
     try:
         data_non_deprecated = query_object.select(query=query, full_data=False)
     except simplejson.errors.JSONDecodeError as e:
@@ -581,7 +587,9 @@ def is_item_subclass_of(item: pywikibot.ItemPage, subclass: pywikibot.ItemPage):
     }
     """
 
-    query_object = mySparql.MySparqlQuery()
+    # query_object = mySparql.MySparqlQuery()
+    query_object = mySparql.MySparqlQuery(endpoint="https://query-main.wikidata.org/sparql",
+                                          entity_url='http://www.wikidata.org/entity/')
     data_is_subclass = query_object.select(query=query, full_data=False)
     if len(data_is_subclass) == 0:
         # not subclass of
@@ -736,7 +744,9 @@ def get_all_non_deprecated_items_languages(limit: Union[int, None] = None, offse
         # VALUES ?nkcr {'test123' 'xx0313436' 'xx0313312' 'uk20241216330'}
     }  LIMIT """ + str(limit) + """ OFFSET """ + str(offset) + """
     """
-    query_object = mySparql.MySparqlQuery()
+    # query_object = mySparql.MySparqlQuery()
+    query_object = mySparql.MySparqlQuery(endpoint="https://query-main.wikidata.org/sparql",
+                                          entity_url='http://www.wikidata.org/entity/')
     try:
         data_non_deprecated = query_object.select(query=query, full_data=False)
     except simplejson.errors.JSONDecodeError:

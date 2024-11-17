@@ -55,6 +55,7 @@ gc.enable()
 bot_password = get_bot_password('bot_password')
 
 wbi_config['USER_AGENT'] = 'Frettiebot/1.0 (https://www.wikidata.org/wiki/User:Frettiebot)'
+wbi_config['SPARQL_ENDPOINT_URL'] = 'https://query-main.wikidata.org/sparql'
 login_instance = wbi_login.Login(user='Frettiebot', password=bot_password)
 wbi = WikibaseIntegrator(login=login_instance, is_bot=True)
 
