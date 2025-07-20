@@ -15,7 +15,7 @@ from pywikibot.data import sparql
 from wikibaseintegrator import wbi_helpers
 from wikibaseintegrator.datatypes import Item, ExternalID, Time, String
 from wikibaseintegrator.entities import ItemEntity
-from wikibaseintegrator.wbi_enums import WikibaseDatePrecision, WikibaseDatatype, ActionIfExists
+from wikibaseintegrator.wbi_enums import WikibaseTimePrecision, WikibaseDatatype, ActionIfExists
 
 import cleaners
 import mySparql
@@ -73,7 +73,7 @@ def add_new_field_to_item_wbi(
         [
             Item(value='Q13550863', prop_nr='P248'),
             ExternalID(value=nkcr_aut_new_field, prop_nr='P691'),
-            Time(time=now.strftime('+%Y-%m-%dT00:00:00Z'), prop_nr='P813', precision=WikibaseDatePrecision.DAY),
+            Time(time=now.strftime('+%Y-%m-%dT00:00:00Z'), prop_nr='P813', precision=WikibaseTimePrecision.DAY),
         ]
     ]
 
@@ -134,7 +134,7 @@ def add_nkcr_aut_to_item_wbi(
         [
             Item(value='Q13550863', prop_nr='P248'),
             ExternalID(value=nkcr_aut_to_add, prop_nr='P691'),
-            Time(time=now.strftime('+%Y-%m-%dT00:00:00Z'), prop_nr='P813', precision=WikibaseDatePrecision.DAY),
+            Time(time=now.strftime('+%Y-%m-%dT00:00:00Z'), prop_nr='P813', precision=WikibaseTimePrecision.DAY),
         ]
     ]
 
