@@ -4,6 +4,7 @@ import time
 import timeit
 from logging.handlers import TimedRotatingFileHandler, RotatingFileHandler
 
+from wikibaseintegrator.wbi_enums import WikibaseRank
 from wikibaseintegrator.wbi_exceptions import MissingEntityException, MWApiError, ModificationFailed, SaveFailed, \
     NonExistentEntityError, MaxRetriesReachedException
 
@@ -208,12 +209,18 @@ if __name__ == '__main__':
                     if processor.item is not None and Config.debug is not True:
                         change_text_array = []
                         changed = False
+
                         if (processor.get_item().labels.get('cs') is None) and len(row['100a']) > 0:
                             whole_name = tools.first_name(row['100a']) + ' ' + tools.last_name(row['100a'])
                             processor.get_item().labels.set('cs', whole_name, ActionIfExists.REPLACE_ALL)
                             log_with_date_time('New CS label for ' + nkcr_aut + ' is ' + whole_name)
                             changed = True
                             change_text_array.append('cs label')
+
+                        nkcrs_wd = processor.get_item().claims.get('P691')
+                        for nkcr in nkcrs_wd:
+                            if nkcr.rank == WikibaseRank.DEPRECATED and nkcr.mainsnak.datavalue.get('value') == nkcr_aut:
+                                changed = False
 
                         if changed is not True:
                             for prop in Config.properties.values():
