@@ -60,6 +60,7 @@ class Config:
     qid_blacklist:list[str] = [
         'Q102247991',
         'Q59584399',
+        'Q29020960',
     ]
 
     property_occupation = 'P106'
