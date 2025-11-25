@@ -3,6 +3,13 @@
 /cache.csv
 /throttle.ctrl
 /apicache-py3
+/apicache
+*.pyc
+*.log
+*.log.1
+*.log.2
+*.lwp
+*.csv
 /__pycache__
 /bot_password
 /catmandu.log
