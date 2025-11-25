@@ -200,6 +200,14 @@ if __name__ == '__main__':
                     }
                     processor.set_enabled_columns(properties)
                     processor.process_occupation_type(loader.non_deprecated_items_places)
+
+                    properties = {
+                        '046f': 'P569',
+                        '046g': 'P570',
+                        '678a': ['P569', 'P570'],
+                    }
+                    processor.set_enabled_columns(properties)
+                    processor.process_occupation_type(loader.non_deprecated_items)
                     time_process_after = time.time()
                     if (time_process_after - time_start > 1):
                         log_with_date_time('time_from_start_to_process_after:' + str(time_process_after - time_start))
@@ -240,6 +248,7 @@ if __name__ == '__main__':
                             inserts = inserts + 1
                             # if inserts % 10 == 0:
                             #     log_with_date_time('inserted: ' + str(inserts))
+                            #TADY kontrolovat časové
                             processor.item.write(
                                 summary="Update NK ČR – " + ', '.join(change_text_array),
                                 is_bot=True,

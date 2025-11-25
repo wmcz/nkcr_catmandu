@@ -81,6 +81,9 @@ def add_new_field_to_item_wbi(
         # string
         final = {'item': item_new_field.id, 'prop': property_new_field, 'value': value}
         new_claim = ExternalID(value=value, prop_nr=property_new_field, references=references)
+    elif property_new_field in ['P569', 'P570']:
+        final = {'item': item_new_field.id, 'prop': property_new_field, 'value': value}
+        new_claim = Time(time=value, prop_nr=property_new_field, references=references)
     else:
         final = {'item': item_new_field.id, 'prop': property_new_field, 'value': value}
         new_claim = Item(value=value, prop_nr=property_new_field, references=references)
@@ -227,10 +230,12 @@ def get_all_non_deprecated_items(limit: Union[int, None] = None, offset: Union[i
     non_deprecated_dictionary: dict[dict[str, list, list]] = {}
 
     query = """
-    select ?item ?nkcr ?isni ?orcid where {
+    select ?item ?nkcr ?isni ?orcid ?birth ?death where {
         ?item p:P691 [ps:P691 ?nkcr ; wikibase:rank ?rank ] filter(?rank != wikibase:DeprecatedRank) .
         OPTIONAL{?item wdt:P213 ?isni}.
         OPTIONAL{?item wdt:P496 ?orcid}.
+        OPTIONAL{?item wdt:P569 ?birth}.
+        OPTIONAL{?item wdt:P570 ?death}.
         # VALUES ?nkcr {'test123' 'xx0313436' 'xx0313312' 'uk20241216330'}
     } LIMIT """ + str(limit) + """ OFFSET """ + str(offset) + """
     """
@@ -269,12 +274,28 @@ def get_all_non_deprecated_items(limit: Union[int, None] = None, offset: Union[i
         else:
             orcid = None
 
+        if item_non_deprecated['birth'] is not None:
+            birth = item_non_deprecated['birth']
+        else:
+            birth = None
+
+        if item_non_deprecated['death'] is not None:
+            death = item_non_deprecated['death']
+        else:
+            death = None
+
         if non_deprecated_dictionary.get(item_non_deprecated['nkcr'], None):
             if isni is not None:
                 non_deprecated_dictionary[item_non_deprecated['nkcr']]['isni'].append(isni)
 
             if orcid is not None:
                 non_deprecated_dictionary[item_non_deprecated['nkcr']]['orcid'].append(orcid)
+
+            if birth is not None:
+                non_deprecated_dictionary[item_non_deprecated['nkcr']]['birth'].append(birth)
+
+            if death is not None:
+                non_deprecated_dictionary[item_non_deprecated['nkcr']]['death'].append(death)
         else:
             if isni is not None:
                 isni_add = [isni]
@@ -286,10 +307,22 @@ def get_all_non_deprecated_items(limit: Union[int, None] = None, offset: Union[i
             else:
                 orcid_add = []
 
+            if birth is not None:
+                birth_add = [birth]
+            else:
+                birth_add = []
+
+            if death is not None:
+                death_add = [death]
+            else:
+                death_add = []
+
             non_deprecated_dictionary[item_non_deprecated['nkcr']] = {
                 'qid': item_non_deprecated['item'].replace('http://www.wikidata.org/entity/', ''),
                 'isni': isni_add,
                 'orcid': orcid_add,
+                'birth': birth_add,
+                'death': death_add,
             }
     del data_non_deprecated
     return non_deprecated_dictionary

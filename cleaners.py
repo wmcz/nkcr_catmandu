@@ -1,7 +1,11 @@
 import logging
 import re
 from typing import Union
+from datetime import datetime
+from wikibaseintegrator.datatypes import Item, ExternalID, Time, String
+from wikibaseintegrator.wbi_enums import WikibaseTimePrecision
 
+import config
 from nkcr_exceptions import BadItemException
 
 name_to_nkcr: dict = {}
@@ -33,7 +37,7 @@ def clean_qid(string: str) -> str:
     return string
 
 
-def prepare_orcid_from_nkcr(orcid: str) -> str:
+def prepare_orcid_from_nkcr(orcid: str, column) -> str:
     # https://pythonexamples.org/python-split-string-into-specific-length-chunks/
     orcid = orcid.replace(' ', '')
     regex = u"^(\d{4}-){3}\d{3}(\d|X)$"
@@ -45,7 +49,7 @@ def prepare_orcid_from_nkcr(orcid: str) -> str:
         return orcid
 
 
-def prepare_occupation_from_nkcr(occupation_string: str) -> Union[str, list]:
+def prepare_occupation_from_nkcr(occupation_string: str, column) -> Union[str, list]:
     nkcr_to_qid = name_to_nkcr
     occupations = []
     # log_with_date_time(occupation_string)
@@ -73,7 +77,7 @@ def prepare_occupation_from_nkcr(occupation_string: str) -> Union[str, list]:
         #         pass
     return occupations
 
-def prepare_language_from_nkcr(language_string: str) -> Union[str, list]:
+def prepare_language_from_nkcr(language_string: str, column) -> Union[str, list]:
     nkcr_to_qid = language_dict
     languages = []
     # log_with_date_time(occupation_string)
@@ -101,7 +105,7 @@ def prepare_language_from_nkcr(language_string: str) -> Union[str, list]:
         #         pass
     return languages
 
-def prepare_places_from_nkcr(place_string: str) -> Union[str, list]:
+def prepare_places_from_nkcr(place_string: str, column) -> Union[str, list]:
     nkcr_to_qid = name_to_nkcr
     places: list = []
     # log_with_date_time(occupation_string)
@@ -146,7 +150,7 @@ def prepare_places_from_nkcr(place_string: str) -> Union[str, list]:
     return places
 
 
-def prepare_isni_from_nkcr(isni: str) -> str:
+def prepare_isni_from_nkcr(isni: str, column) -> str:
     # https://pythonexamples.org/python-split-string-into-specific-length-chunks/
     isni = isni.replace(' ', '')
     regex = u"^(\d{16})$"
@@ -159,6 +163,63 @@ def prepare_isni_from_nkcr(isni: str) -> str:
         str_chunks = [isni[i:i + n] for i in range(0, len(isni), n)]
         return ''.join(str_chunks)
 
+def prepare_date_from_date_field(date: str, column) -> Union[None, Time]:
+    #První místo kam se podívat: Pole 046f (narození)/046g (úmrtí)
+    #Splitnout výraz YYYYMMDD na YYYY-MM-DD. Příklad záznam xx0194367.
+    #19420427 na YYYY-MM-DD
+    #1942 na YYYY
+    prop = config.Config.properties.get(column, 'P569')
+    if len(date) == 8:
+        str = f"{date[0:4]}-{date[4:6]}-{date[6:8]}"
+        str_time = '+' + str + 'T00:00:00Z'
+        return Time(time=str_time, prop_nr=prop, precision=WikibaseTimePrecision.DAY)
+    if len(date) == 4:
+        str_time = '+' + date + '-01-01T00:00:00Z'
+        return Time(time=str_time, prop_nr=prop, precision=WikibaseTimePrecision.YEAR)
+    return None
+
+def prepare_date_from_description(description: str, column) -> Union[Time, None]:
+    # Regex [Nn]arozena? ([0-9]\. )+
+    # [Zz]emřela? ([0-9]\. )+
+    # Odstranit koncovou tečku pokud je zachycena
+    # Odstranit mezery mezi části datumu
+    # Zkontrolovat ze se jedna o realne datum (ne třeba třináctý měsíc)
+    # Já to dělal tímto regexem: [1-3]?[0-9]\.[0-1]?[0-9]\.[0-9]{4}
+    # Ale to nepostihne 35. Dny a 13. Měsíce a podobně
+    # Zkonvertovat na YY-MM-DD
+    # Zkontrolovat ze to je >1600 (gregoriansky kalendar), jinak neimportovat
+
+    prop = config.Config.properties.get(column, 'P569')
+
+    if not re.search(r'\b(narozen|narozena|zemřel|zemřela)\b', description, re.IGNORECASE):
+        return None
+
+    # Regex for DD. MM. YYYY
+    match = re.search(r'(\d{1,2})\.\s*(\d{1,2})\.\s*(\d{4})', description)
+    if match:
+        day, month, year = match.groups()
+        try:
+            # Validate date
+            date_obj = datetime(int(year), int(month), int(day))
+            if date_obj.year > 1600:
+                return Time(time=date_obj.strftime('+%Y-%m-%dT00:00:00Z'), prop_nr=prop, precision=WikibaseTimePrecision.DAY)
+        except ValueError:
+            # Invalid date like 32. 13. 2000
+            pass
+
+    # Regex for YYYY
+    match = re.search(r'\b(\d{4})\b', description)
+    if match:
+        year = match.group(1)
+        try:
+            year_int = int(year)
+            if 1600 < year_int <= datetime.now().year:  # Some basic validation
+                str_time = '+' + year + '-01-01T00:00:00Z'
+                return Time(time=str_time, prop_nr=prop, precision=WikibaseTimePrecision.YEAR)
+        except ValueError:
+            pass
+
+    return None
 
 def prepare_column_of_content(column: str, row) -> Union[str, Union[str, list]]:
     column_to_method_dictionary = {
@@ -170,8 +231,11 @@ def prepare_column_of_content(column: str, row) -> Union[str, Union[str, list]]:
         '370b': prepare_places_from_nkcr,
         '370f': prepare_places_from_nkcr,
         '377a': prepare_language_from_nkcr,
+        '046f': prepare_date_from_date_field,
+        '046g': prepare_date_from_date_field,
+        '678a': prepare_date_from_description,
     }
-    return column_to_method_dictionary[column](row[column])
+    return column_to_method_dictionary[column](row[column], column)
 
 
 def resolve_exist_claims(column: str, wd_data: dict) -> Union[str, list]:
@@ -188,6 +252,12 @@ def resolve_exist_claims(column: str, wd_data: dict) -> Union[str, list]:
         claims = wd_data['birth']
     if column == '370b':
         claims = wd_data['death']
+    if column == '046f':
+        claims = wd_data['birth']
+    if column == '046g':
+        claims = wd_data['death']
+    if column == '678a':
+        claims = wd_data['birth']
     if column == '370f':
         claims = wd_data['work']
     if column == '377a':

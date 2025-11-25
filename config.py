@@ -1,7 +1,7 @@
 class Config:
     user_name: str = 'Frettiebot'
     debug: bool = False
-    use_json_database: bool = False
+    use_json_database: bool = True
     count_first_step: int = 0
     count_second_step: int = 0
 
@@ -77,5 +77,8 @@ class Config:
         '370b': 'P20',
         '370f': 'P937',
         '377a': 'P1412',
+        '046f': 'P569',
+        '046g': 'P570',
+        '678a': 'P569',
         '_id': 'P691',
     }
