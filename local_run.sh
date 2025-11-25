@@ -14,5 +14,5 @@ echo "Converted to CSV"
 # TODO: Copy output.csv to autority.wikimedia.cz by scp
 #echo "Copied output.csv to autority.wikimedia.cz"
 #rm cache.csv
-. /Users/jirisedlacek/htdocs/nkcr_catmandu/bin/activate && python3 /Users/jirisedlacek/htdocs/nkcr_catmandu/main.py --input /Users/jirisedlacek/htdocs/nkcr_catmandu/output.csv ; deactivate
+. /Users/jirisedlacek/htdocs/nkcr_catmandu/venv/bin/activate && python3 /Users/jirisedlacek/htdocs/nkcr_catmandu/main.py --input /Users/jirisedlacek/htdocs/nkcr_catmandu/output.csv ; deactivate
 
