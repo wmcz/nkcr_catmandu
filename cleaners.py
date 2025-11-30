@@ -178,48 +178,61 @@ def prepare_date_from_date_field(date: str, column) -> Union[None, Time]:
         return Time(time=str_time, prop_nr=prop, precision=WikibaseTimePrecision.YEAR)
     return None
 
-def prepare_date_from_description(description: str, column) -> Union[Time, None]:
-    # Regex [Nn]arozena? ([0-9]\. )+
-    # [Zz]emřela? ([0-9]\. )+
-    # Odstranit koncovou tečku pokud je zachycena
-    # Odstranit mezery mezi části datumu
-    # Zkontrolovat ze se jedna o realne datum (ne třeba třináctý měsíc)
-    # Já to dělal tímto regexem: [1-3]?[0-9]\.[0-1]?[0-9]\.[0-9]{4}
-    # Ale to nepostihne 35. Dny a 13. Měsíce a podobně
-    # Zkonvertovat na YY-MM-DD
-    # Zkontrolovat ze to je >1600 (gregoriansky kalendar), jinak neimportovat
+def prepare_date_from_description(description: str, column) -> Union[list[Time], None]:
+    dates = []
+    # Regex for narozena/narozen
+    birth_matches = re.finditer(r'\b(narozen|narozena)\b', description, re.IGNORECASE)
+    for birth_match in birth_matches:
+        substring = description[birth_match.end():]
+        date_match = re.search(r'(\d{1,2})\.\s*(\d{1,2})\.\s*(\d{4})', substring)
+        if date_match:
+            day, month, year = date_match.groups()
+            try:
+                date_obj = datetime(int(year), int(month), int(day))
+                if date_obj.year > 1600:
+                    str_time = date_obj.strftime('+%Y-%m-%dT00:00:00Z')
+                    dates.append(Time(time=str_time, prop_nr='P569', precision=WikibaseTimePrecision.DAY))
+            except ValueError:
+                pass
+        else:
+            date_match = re.search(r'\b(\d{4})\b', substring)
+            if date_match:
+                year = date_match.group(1)
+                try:
+                    year_int = int(year)
+                    if 1600 < year_int <= datetime.now().year:
+                        str_time = '+' + year + '-01-01T00:00:00Z'
+                        dates.append(Time(time=str_time, prop_nr='P569', precision=WikibaseTimePrecision.YEAR))
+                except ValueError:
+                    pass
 
-    prop = config.Config.properties.get(column, 'P569')
+    # Regex for zemrel/zemrela
+    death_matches = re.finditer(r'\b(zemřel|zemřela)\b', description, re.IGNORECASE)
+    for death_match in death_matches:
+        substring = description[death_match.end():]
+        date_match = re.search(r'(\d{1,2})\.\s*(\d{1,2})\.\s*(\d{4})', substring)
+        if date_match:
+            day, month, year = date_match.groups()
+            try:
+                date_obj = datetime(int(year), int(month), int(day))
+                if date_obj.year > 1600:
+                    str_time = date_obj.strftime('+%Y-%m-%dT00:00:00Z')
+                    dates.append(Time(time=str_time, prop_nr='P570', precision=WikibaseTimePrecision.DAY))
+            except ValueError:
+                pass
+        else:
+            date_match = re.search(r'\b(\d{4})\b', substring)
+            if date_match:
+                year = date_match.group(1)
+                try:
+                    year_int = int(year)
+                    if 1600 < year_int <= datetime.now().year:
+                        str_time = '+' + year + '-01-01T00:00:00Z'
+                        dates.append(Time(time=str_time, prop_nr='P570', precision=WikibaseTimePrecision.YEAR))
+                except ValueError:
+                    pass
 
-    if not re.search(r'\b(narozen|narozena|zemřel|zemřela)\b', description, re.IGNORECASE):
-        return None
-
-    # Regex for DD. MM. YYYY
-    match = re.search(r'(\d{1,2})\.\s*(\d{1,2})\.\s*(\d{4})', description)
-    if match:
-        day, month, year = match.groups()
-        try:
-            # Validate date
-            date_obj = datetime(int(year), int(month), int(day))
-            if date_obj.year > 1600:
-                return Time(time=date_obj.strftime('+%Y-%m-%dT00:00:00Z'), prop_nr=prop, precision=WikibaseTimePrecision.DAY)
-        except ValueError:
-            # Invalid date like 32. 13. 2000
-            pass
-
-    # Regex for YYYY
-    match = re.search(r'\b(\d{4})\b', description)
-    if match:
-        year = match.group(1)
-        try:
-            year_int = int(year)
-            if 1600 < year_int <= datetime.now().year:  # Some basic validation
-                str_time = '+' + year + '-01-01T00:00:00Z'
-                return Time(time=str_time, prop_nr=prop, precision=WikibaseTimePrecision.YEAR)
-        except ValueError:
-            pass
-
-    return None
+    return dates if dates else None
 
 def prepare_column_of_content(column: str, row) -> Union[str, Union[str, list]]:
     column_to_method_dictionary = {
@@ -257,7 +270,7 @@ def resolve_exist_claims(column: str, wd_data: dict) -> Union[str, list]:
     if column == '046g':
         claims = wd_data['death']
     if column == '678a':
-        claims = wd_data['birth']
+        claims = wd_data.get('birth', []) + wd_data.get('death', [])
     if column == '370f':
         claims = wd_data['work']
     if column == '377a':

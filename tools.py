@@ -81,9 +81,9 @@ def add_new_field_to_item_wbi(
         # string
         final = {'item': item_new_field.id, 'prop': property_new_field, 'value': value}
         new_claim = ExternalID(value=value, prop_nr=property_new_field, references=references)
-    elif property_new_field in ['P569', 'P570']:
+    elif property_new_field in ['P569', 'P570'] or property_new_field == ['P569', 'P570']:
         final = {'item': item_new_field.id, 'prop': property_new_field, 'value': value}
-        new_claim = Time(time=value, prop_nr=property_new_field, references=references)
+        new_claim = value
     else:
         final = {'item': item_new_field.id, 'prop': property_new_field, 'value': value}
         new_claim = Item(value=value, prop_nr=property_new_field, references=references)
@@ -597,19 +597,38 @@ def get_claim_from_item_by_property(datas: dict[str, Any], property_of_item: str
     return claims_from_data
 
 
-def get_claim_from_item_by_property_wbi(datas: ItemEntity, property_of_item: str) -> list:
-    claims_from_data = []
-    try:
-        claims_by_property = datas.claims.get(property_of_item)
-    except KeyError:
-        return []
-    for claim in claims_by_property:
-        if claim.mainsnak.datatype == WikibaseDatatype.EXTERNALID.value:
-            claims_from_data.append(claim.mainsnak.datavalue['value'])
-        else:
-            claims_from_data.append(claim.mainsnak.datavalue['value']['id'])
+def get_claim_from_item_by_property_wbi(datas: ItemEntity, property_of_item: list) -> list:
+    if type(property_of_item) is list:
+        claims_from_data = []
+        for prop in property_of_item:
+            try:
+                claims_by_property = datas.claims.get(prop)
+            except KeyError:
+                pass
+            for claim in claims_by_property:
+                if claim.mainsnak.datatype == WikibaseDatatype.EXTERNALID.value:
+                    claims_from_data.append(claim.mainsnak.datavalue['value'])
+                elif claim.mainsnak.datatype == WikibaseDatatype.TIME.value:
+                    claims_from_data.append(claim.mainsnak.datavalue['value'])
+                else:
+                    claims_from_data.append(claim.mainsnak.datavalue['value']['id'])
 
-    return claims_from_data
+        return claims_from_data
+    else:
+        claims_from_data = []
+        try:
+            claims_by_property = datas.claims.get(property_of_item)
+        except KeyError:
+            return []
+        for claim in claims_by_property:
+            if claim.mainsnak.datatype == WikibaseDatatype.EXTERNALID.value:
+                claims_from_data.append(claim.mainsnak.datavalue['value'])
+            elif claim.mainsnak.datatype == WikibaseDatatype.TIME.value:
+                claims_from_data.append(claim.mainsnak.datavalue['value'])
+            else:
+                claims_from_data.append(claim.mainsnak.datavalue['value']['id'])
+
+        return claims_from_data
 
 
 def is_item_subclass_of(item: pywikibot.ItemPage, subclass: pywikibot.ItemPage):

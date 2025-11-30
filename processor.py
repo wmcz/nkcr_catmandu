@@ -63,15 +63,25 @@ class Processor:
 
                 row_new_fields[column] = prepare_column_of_content(column, row_new_fields)
                 array_diff = []
+                time_fields = False
                 if type(row_new_fields[column]) is list:
-                    array_diff = set(row_new_fields[column]) - set(claims)
+                    for dt in row_new_fields[column]:
+                        if type(dt) == Time:
+                            time_fields = True
+                    if not time_fields:
+                        array_diff = set(row_new_fields[column]) - set(claims)
+                    else:
+                        if len(claims):
+                            self.save = False
                 if (self.save
                         and (
                             (type(row_new_fields[column]) == str and row_new_fields[column] not in claims and len(row_new_fields[column]) > 0)
                             or
-                            (type(row_new_fields[column]) == list and len(array_diff) > 0)
+                            (type(row_new_fields[column]) == list and len(array_diff) > 0 and not time_fields)
                             or
                             (type(row_new_fields[column]) == Time)
+                            or
+                            (time_fields)
                         )
                 ):
 
@@ -128,7 +138,13 @@ class Processor:
                                 column=column, row_new_fields=row_new_fields,
                                 claim_direct_from_wd=claim_direct_from_wd, item_new_field=item_new_field)
                             property_processor.process()
-                    elif type(row_new_fields[column]) is Time or type(row_new_fields[column]) is None:
+                        elif time_fields:
+                            property_processor = PropertyProcessorDates(
+                                wbi=self.wbi, property_for_new_field=property_for_new_field,
+                                column=column, row_new_fields=row_new_fields,
+                                claim_direct_from_wd=claim_direct_from_wd, item_new_field=item_new_field)
+                            property_processor.process()
+                    elif type(row_new_fields[column]) is Time or type(row_new_fields[column]) is None or time_fields:
                         property_processor = PropertyProcessorDates(
                             wbi=self.wbi, property_for_new_field=property_for_new_field,
                             column=column, row_new_fields=row_new_fields,

@@ -34,3 +34,10 @@ class BasePropertyProcessor:
             # if type(cdfwd) is pywikibot.ItemPage:
             qid_claims_direct_from_wd.append(cdfwd)
         return qid_claims_direct_from_wd
+
+    def get_qid_claims_direct_from_wd_by_precision(self, property) -> dict:
+        qid_claims_direct_from_wd = {}
+        for cdfwd in self.item_new_field.claims.get(property):
+            # if type(cdfwd) is pywikibot.ItemPage:
+            qid_claims_direct_from_wd[cdfwd.mainsnak.datavalue['value']['precision']] = cdfwd.mainsnak.datavalue['value']
+        return qid_claims_direct_from_wd
