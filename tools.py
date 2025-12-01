@@ -15,6 +15,7 @@ from pywikibot.data import sparql
 from wikibaseintegrator import wbi_helpers
 from wikibaseintegrator.datatypes import Item, ExternalID, Time, String
 from wikibaseintegrator.entities import ItemEntity
+from wikibaseintegrator.models import References
 from wikibaseintegrator.wbi_enums import WikibaseTimePrecision, WikibaseDatatype, ActionIfExists
 
 import cleaners
@@ -83,6 +84,12 @@ def add_new_field_to_item_wbi(
         new_claim = ExternalID(value=value, prop_nr=property_new_field, references=references)
     elif property_new_field in ['P569', 'P570'] or property_new_field == ['P569', 'P570']:
         final = {'item': item_new_field.id, 'prop': property_new_field, 'value': value}
+        value: Time
+        new_refs = References()
+        for ref in references:
+            for ref_claim in ref:
+                new_refs.add(ref_claim)
+        value.references = new_refs
         new_claim = value
     else:
         final = {'item': item_new_field.id, 'prop': property_new_field, 'value': value}
@@ -236,7 +243,7 @@ def get_all_non_deprecated_items(limit: Union[int, None] = None, offset: Union[i
         OPTIONAL{?item wdt:P496 ?orcid}.
         OPTIONAL{?item wdt:P569 ?birth}.
         OPTIONAL{?item wdt:P570 ?death}.
-        # VALUES ?nkcr {'test123' 'xx0313436' 'xx0313312' 'uk20241216330'}
+        # VALUES ?nkcr {'mub2013789925' 'xx0270669' 'xx0279468' 'uk20241216330'}
     } LIMIT """ + str(limit) + """ OFFSET """ + str(offset) + """
     """
 

@@ -233,12 +233,22 @@ if __name__ == '__main__':
                         if changed is not True:
                             for prop in Config.properties.values():
                                 try:
-                                    values = processor.get_item().claims.get(prop)
-                                    for value in values:
-                                        id = value.id
-                                        if (id is None):
-                                            change_text_array.append(prop)
-                                            changed = True
+                                    if (type(prop) is list):
+                                        proplist = prop
+                                        for prop in proplist:
+                                            values = processor.get_item().claims.get(prop)
+                                            for value in values:
+                                                id = value.id
+                                                if (id is None):
+                                                    change_text_array.append(prop)
+                                                    changed = True
+                                    else:
+                                        values = processor.get_item().claims.get(prop)
+                                        for value in values:
+                                            id = value.id
+                                            if (id is None):
+                                                change_text_array.append(prop)
+                                                changed = True
                                 except KeyError as e:
                                     pass
 
@@ -250,7 +260,7 @@ if __name__ == '__main__':
                             #     log_with_date_time('inserted: ' + str(inserts))
                             #TADY kontrolovat časové
                             processor.item.write(
-                                summary="Update NK ČR – " + ', '.join(change_text_array),
+                                summary="Update NK ČR – " + ', '.join(set(change_text_array)),
                                 is_bot=True,
                                 retry_after=10,
                                 tags=['Czech-Authorities-Sync'])
