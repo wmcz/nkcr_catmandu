@@ -15,7 +15,7 @@ from pywikibot.data import sparql
 from wikibaseintegrator import wbi_helpers
 from wikibaseintegrator.datatypes import Item, ExternalID, Time, String
 from wikibaseintegrator.entities import ItemEntity
-from wikibaseintegrator.models import References
+from wikibaseintegrator.models import References, Snaks, Claim, Snak, Reference
 from wikibaseintegrator.wbi_enums import WikibaseTimePrecision, WikibaseDatatype, ActionIfExists
 
 import cleaners
@@ -85,11 +85,21 @@ def add_new_field_to_item_wbi(
     elif property_new_field in ['P569', 'P570'] or property_new_field == ['P569', 'P570']:
         final = {'item': item_new_field.id, 'prop': property_new_field, 'value': value}
         value: Time
-        new_refs = References()
-        for ref in references:
-            for ref_claim in ref:
-                new_refs.add(ref_claim)
-        value.references = new_refs
+
+        ref = Reference()
+        ref_list = [
+            Item(value='Q13550863', prop_nr='P248'),
+            ExternalID(value=nkcr_aut_new_field, prop_nr='P691'),
+            Time(time=now.strftime('+%Y-%m-%dT00:00:00Z'), prop_nr='P813', precision=WikibaseTimePrecision.DAY),
+        ]
+        if isinstance(ref_list, list):
+            snaks = Snaks()
+            for ref_claim in ref_list:
+                if isinstance(ref_claim, Claim):
+                    snaks.add(Snak().from_json(ref_claim.get_json()['mainsnak']))
+            ref.snaks = snaks
+
+        value.references.add(ref)
         new_claim = value
     else:
         final = {'item': item_new_field.id, 'prop': property_new_field, 'value': value}
