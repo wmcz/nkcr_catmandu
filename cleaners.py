@@ -169,13 +169,14 @@ def prepare_date_from_date_field(date: str, column) -> Union[None, Time]:
     #19420427 na YYYY-MM-DD
     #1942 na YYYY
     prop = config.Config.properties.get(column, 'P569')
-    if len(date) == 8:
-        str = f"{date[0:4]}-{date[4:6]}-{date[6:8]}"
-        str_time = '+' + str + 'T00:00:00Z'
-        return Time(time=str_time, prop_nr=prop, precision=WikibaseTimePrecision.DAY)
-    if len(date) == 4:
-        str_time = '+' + date + '-01-01T00:00:00Z'
-        return Time(time=str_time, prop_nr=prop, precision=WikibaseTimePrecision.YEAR)
+    if (type(date) == str):
+        if len(date) == 8:
+            str = f"{date[0:4]}-{date[4:6]}-{date[6:8]}"
+            str_time = '+' + str + 'T00:00:00Z'
+            return Time(time=str_time, prop_nr=prop, precision=WikibaseTimePrecision.DAY)
+        if len(date) == 4:
+            str_time = '+' + date + '-01-01T00:00:00Z'
+            return Time(time=str_time, prop_nr=prop, precision=WikibaseTimePrecision.YEAR)
     return None
 
 def prepare_date_from_description(description: str, column) -> Union[list[Time], None]:
