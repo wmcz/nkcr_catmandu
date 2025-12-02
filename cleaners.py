@@ -1,6 +1,6 @@
 import logging
 import re
-from typing import Union
+from typing import Union, Any
 from datetime import datetime
 from wikibaseintegrator.datatypes import Item, ExternalID, Time, String
 from wikibaseintegrator.wbi_enums import WikibaseTimePrecision
@@ -163,16 +163,16 @@ def prepare_isni_from_nkcr(isni: str, column) -> str:
         str_chunks = [isni[i:i + n] for i in range(0, len(isni), n)]
         return ''.join(str_chunks)
 
-def prepare_date_from_date_field(date: str, column) -> Union[None, Time]:
+def prepare_date_from_date_field(date: Any, column) -> Union[None, Time]:
     #První místo kam se podívat: Pole 046f (narození)/046g (úmrtí)
     #Splitnout výraz YYYYMMDD na YYYY-MM-DD. Příklad záznam xx0194367.
     #19420427 na YYYY-MM-DD
     #1942 na YYYY
     prop = config.Config.properties.get(column, 'P569')
-    if (type(date) == str):
+    if isinstance(date, str):
         if len(date) == 8:
-            str = f"{date[0:4]}-{date[4:6]}-{date[6:8]}"
-            str_time = '+' + str + 'T00:00:00Z'
+            date_str = f"{date[0:4]}-{date[4:6]}-{date[6:8]}"
+            str_time = '+' + date_str + 'T00:00:00Z'
             return Time(time=str_time, prop_nr=prop, precision=WikibaseTimePrecision.DAY)
         if len(date) == 4:
             str_time = '+' + date + '-01-01T00:00:00Z'
