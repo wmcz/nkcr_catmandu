@@ -163,7 +163,19 @@ def prepare_isni_from_nkcr(isni: str, column) -> str:
         str_chunks = [isni[i:i + n] for i in range(0, len(isni), n)]
         return ''.join(str_chunks)
 
-def prepare_date_from_date_field(date: Any, column) -> Union[None, Time]:
+def create_time_dict(property, time_string: str, precision: int, timezone: int = 0, calendar_model: str = 'http://www.wikidata.org/entity/Q1985727') -> dict:
+
+    return {
+        'time' : time_string,
+        'timezone' : timezone,
+        'before' : 0,
+        'after' : 0,
+        'precision' : precision,
+        'calendarmodel' : calendar_model,
+        'property' : property,
+    }
+
+def prepare_date_from_date_field(date: Any, column) -> Union[None, dict]:
     #První místo kam se podívat: Pole 046f (narození)/046g (úmrtí)
     #Splitnout výraz YYYYMMDD na YYYY-MM-DD. Příklad záznam xx0194367.
     #19420427 na YYYY-MM-DD
@@ -173,13 +185,15 @@ def prepare_date_from_date_field(date: Any, column) -> Union[None, Time]:
         if len(date) == 8:
             date_str = f"{date[0:4]}-{date[4:6]}-{date[6:8]}"
             str_time = '+' + date_str + 'T00:00:00Z'
-            return Time(time=str_time, prop_nr=prop, precision=WikibaseTimePrecision.DAY)
+            #return Time(time=str_time, prop_nr=prop, precision=WikibaseTimePrecision.DAY)
+            return create_time_dict(prop, str_time, WikibaseTimePrecision.DAY.value)
         if len(date) == 4:
             str_time = '+' + date + '-01-01T00:00:00Z'
-            return Time(time=str_time, prop_nr=prop, precision=WikibaseTimePrecision.YEAR)
+            #return Time(time=str_time, prop_nr=prop, precision=WikibaseTimePrecision.YEAR)
+            return create_time_dict(prop, str_time, WikibaseTimePrecision.YEAR.value)
     return None
 
-def prepare_date_from_description(description: str, column) -> Union[list[Time], None]:
+def prepare_date_from_description(description: str, column) -> Union[list[dict], None]:
     dates = []
     # Regex for narozena/narozen
     birth_matches = re.finditer(r'\b(narozen|narozena)\b', description, re.IGNORECASE)
@@ -192,7 +206,8 @@ def prepare_date_from_description(description: str, column) -> Union[list[Time],
                 date_obj = datetime(int(year), int(month), int(day))
                 if date_obj.year > 1600:
                     str_time = date_obj.strftime('+%Y-%m-%dT00:00:00Z')
-                    dates.append(Time(time=str_time, prop_nr='P569', precision=WikibaseTimePrecision.DAY))
+                    #dates.append(Time(time=str_time, prop_nr='P569', precision=WikibaseTimePrecision.DAY))
+                    dates.append(create_time_dict('P569', str_time, WikibaseTimePrecision.DAY.value))
             except ValueError:
                 pass
         else:
@@ -203,7 +218,8 @@ def prepare_date_from_description(description: str, column) -> Union[list[Time],
                     year_int = int(year)
                     if 1600 < year_int <= datetime.now().year:
                         str_time = '+' + year + '-01-01T00:00:00Z'
-                        dates.append(Time(time=str_time, prop_nr='P569', precision=WikibaseTimePrecision.YEAR))
+                        #dates.append(Time(time=str_time, prop_nr='P569', precision=WikibaseTimePrecision.YEAR))
+                        dates.append(create_time_dict('P569', str_time, WikibaseTimePrecision.YEAR.value))
                 except ValueError:
                     pass
 
@@ -218,7 +234,8 @@ def prepare_date_from_description(description: str, column) -> Union[list[Time],
                 date_obj = datetime(int(year), int(month), int(day))
                 if date_obj.year > 1600:
                     str_time = date_obj.strftime('+%Y-%m-%dT00:00:00Z')
-                    dates.append(Time(time=str_time, prop_nr='P570', precision=WikibaseTimePrecision.DAY))
+                    #dates.append(Time(time=str_time, prop_nr='P570', precision=WikibaseTimePrecision.DAY))
+                    dates.append(create_time_dict('P570', str_time, WikibaseTimePrecision.DAY.value))
             except ValueError:
                 pass
         else:
@@ -229,7 +246,8 @@ def prepare_date_from_description(description: str, column) -> Union[list[Time],
                     year_int = int(year)
                     if 1600 < year_int <= datetime.now().year:
                         str_time = '+' + year + '-01-01T00:00:00Z'
-                        dates.append(Time(time=str_time, prop_nr='P570', precision=WikibaseTimePrecision.YEAR))
+                        #dates.append(Time(time=str_time, prop_nr='P570', precision=WikibaseTimePrecision.YEAR))
+                        dates.append(create_time_dict('P570', str_time, WikibaseTimePrecision.YEAR.value))
                 except ValueError:
                     pass
 

@@ -12,9 +12,10 @@ class PropertyProcessorDates(BasePropertyProcessor):
 
         if type(self.row_new_fields[self.column]) is list:
             for item_date in self.row_new_fields[self.column]:
-                if item_date.mainsnak.datavalue['value'] not in qid_claims_direct_from_wd:
-                    prop = item_date.mainsnak.property_number
-                    new_item_precision = item_date.mainsnak.datavalue['value']['precision']
+                item_date: dict
+                prop = item_date.get('property')
+                if item_date not in qid_claims_direct_from_wd:
+                    new_item_precision = item_date.get('precision', 0)
                     get_qid_claims_direct_from_wd_by_precision = self.get_qid_claims_direct_from_wd_by_precision(prop)
                     precisions = get_qid_claims_direct_from_wd_by_precision.keys()
 
@@ -31,11 +32,12 @@ class PropertyProcessorDates(BasePropertyProcessor):
                         item_date,
                         self.row_new_fields['_id'])
         else:
-            if type(self.row_new_fields[self.column]) is Time:
+            if type(self.row_new_fields[self.column]) is dict:
                 item_date = self.row_new_fields[self.column]
-                if (item_date.mainsnak.datavalue['value'] not in qid_claims_direct_from_wd):
-                    prop = item_date.mainsnak.property_number
-                    new_item_precision = item_date.mainsnak.datavalue['value']['precision']
+                item_date: dict
+                prop = item_date.get('property')
+                if (item_date not in qid_claims_direct_from_wd):
+                    new_item_precision = item_date.get('precision', 0)
                     get_qid_claims_direct_from_wd_by_precision = self.get_qid_claims_direct_from_wd_by_precision(prop)
                     precisions = get_qid_claims_direct_from_wd_by_precision.keys()
                     if len(precisions) == 0:

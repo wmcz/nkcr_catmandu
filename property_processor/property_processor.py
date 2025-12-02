@@ -37,7 +37,8 @@ class BasePropertyProcessor:
 
     def get_qid_claims_direct_from_wd_by_precision(self, property) -> dict:
         qid_claims_direct_from_wd = {}
-        for cdfwd in self.item_new_field.claims.get(property):
+        for cdfwd in self.claim_direct_from_wd:
             # if type(cdfwd) is pywikibot.ItemPage:
-            qid_claims_direct_from_wd[cdfwd.mainsnak.datavalue['value']['precision']] = cdfwd.mainsnak.datavalue['value']
+            if (cdfwd.get('property') == property):
+                qid_claims_direct_from_wd[cdfwd.get('precision')] = cdfwd
         return qid_claims_direct_from_wd

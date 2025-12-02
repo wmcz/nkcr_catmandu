@@ -83,24 +83,8 @@ def add_new_field_to_item_wbi(
         final = {'item': item_new_field.id, 'prop': property_new_field, 'value': value}
         new_claim = ExternalID(value=value, prop_nr=property_new_field, references=references)
     elif property_new_field in ['P569', 'P570'] or property_new_field == ['P569', 'P570']:
-        final = {'item': item_new_field.id, 'prop': property_new_field, 'value': value}
-        value: Time
-
-        ref = Reference()
-        ref_list = [
-            Item(value='Q13550863', prop_nr='P248'),
-            ExternalID(value=nkcr_aut_new_field, prop_nr='P691'),
-            Time(time=now.strftime('+%Y-%m-%dT00:00:00Z'), prop_nr='P813', precision=WikibaseTimePrecision.DAY),
-        ]
-        if isinstance(ref_list, list):
-            snaks = Snaks()
-            for ref_claim in ref_list:
-                if isinstance(ref_claim, Claim):
-                    snaks.add(Snak().from_json(ref_claim.get_json()['mainsnak']))
-            ref.snaks = snaks
-
-        value.references.add(ref)
-        new_claim = value
+        final = {'item': item_new_field.id, 'prop': value.get('property'), 'value': value.get('time')}
+        new_claim = Time(time=value.get('time'), prop_nr=value.get('property'), precision=value.get('precision'), references=references)
     else:
         final = {'item': item_new_field.id, 'prop': property_new_field, 'value': value}
         new_claim = Item(value=value, prop_nr=property_new_field, references=references)
@@ -626,7 +610,9 @@ def get_claim_from_item_by_property_wbi(datas: ItemEntity, property_of_item: lis
                 if claim.mainsnak.datatype == WikibaseDatatype.EXTERNALID.value:
                     claims_from_data.append(claim.mainsnak.datavalue['value'])
                 elif claim.mainsnak.datatype == WikibaseDatatype.TIME.value:
-                    claims_from_data.append(claim.mainsnak.datavalue['value'])
+                    value: dict = claim.mainsnak.datavalue['value']
+                    value.update({'property': prop})
+                    claims_from_data.append(value)
                 else:
                     claims_from_data.append(claim.mainsnak.datavalue['value']['id'])
 
@@ -641,7 +627,9 @@ def get_claim_from_item_by_property_wbi(datas: ItemEntity, property_of_item: lis
             if claim.mainsnak.datatype == WikibaseDatatype.EXTERNALID.value:
                 claims_from_data.append(claim.mainsnak.datavalue['value'])
             elif claim.mainsnak.datatype == WikibaseDatatype.TIME.value:
-                claims_from_data.append(claim.mainsnak.datavalue['value'])
+                value: dict = claim.mainsnak.datavalue['value']
+                value.update({'property': property_of_item})
+                claims_from_data.append(value)
             else:
                 claims_from_data.append(claim.mainsnak.datavalue['value']['id'])
 
