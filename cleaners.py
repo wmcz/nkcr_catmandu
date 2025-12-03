@@ -181,11 +181,11 @@ def prepare_date_from_date_field(date: Any, column) -> Union[None, dict]:
     #19420427 na YYYY-MM-DD
     #1942 na YYYY
     prop = config.Config.properties.get(column, 'P569')
-    if isinstance(date, str):
+    if type(date) == str:
         if len(date) == 8:
             date_str = f"{date[0:4]}-{date[4:6]}-{date[6:8]}"
             str_time = '+' + date_str + 'T00:00:00Z'
-            #return Time(time=str_time, prop_nr=prop, precision=WikibaseTimePrecision.DAY)
+            # return Time(time=str_time, prop_nr=prop, precision=WikibaseTimePrecision.DAY)
             return create_time_dict(prop, str_time, WikibaseTimePrecision.DAY.value)
         if len(date) == 4:
             str_time = '+' + date + '-01-01T00:00:00Z'
@@ -194,65 +194,60 @@ def prepare_date_from_date_field(date: Any, column) -> Union[None, dict]:
     return None
 
 def prepare_date_from_description(description: str, column) -> Union[list[dict], None]:
-    if (type(description) != str):
-        return []
-    dates = []
-    # Regex for narozena/narozen
-    # print(description)
-    birth_matches = re.finditer(r'\b(narozen|narozena)\b', description, re.IGNORECASE)
-    for birth_match in birth_matches:
-        substring = description[birth_match.end():birth_match.end() + 20]
-        date_match = re.search(r'(\d{1,2})\.\s*(\d{1,2})\.\s*(\d{4})', substring)
-        if date_match:
-            day, month, year = date_match.groups()
-            try:
-                date_obj = datetime(int(year), int(month), int(day))
-                if date_obj.year > 1600:
-                    str_time = date_obj.strftime('+%Y-%m-%dT00:00:00Z')
-                    #dates.append(Time(time=str_time, prop_nr='P569', precision=WikibaseTimePrecision.DAY))
-                    dates.append(create_time_dict('P569', str_time, WikibaseTimePrecision.DAY.value))
-            except ValueError:
-                pass
-        else:
-            date_match = re.search(r'\b(\d{4})\b', substring)
-            if date_match:
-                year = date_match.group(1)
-                try:
-                    year_int = int(year)
-                    if 1600 < year_int <= datetime.now().year:
-                        str_time = '+' + year + '-01-01T00:00:00Z'
-                        #dates.append(Time(time=str_time, prop_nr='P569', precision=WikibaseTimePrecision.YEAR))
-                        dates.append(create_time_dict('P569', str_time, WikibaseTimePrecision.YEAR.value))
-                except ValueError:
-                    pass
+    if type(description) != str:
+        return None
 
-    # Regex for zemrel/zemrela
-    death_matches = re.finditer(r'\b(zemřel|zemřela)\b', description, re.IGNORECASE)
-    for death_match in death_matches:
-        substring = description[death_match.end():death_match.end() + 20]
-        date_match = re.search(r'(\d{1,2})\.\s*(\d{1,2})\.\s*(\d{4})', substring)
-        if date_match:
-            day, month, year = date_match.groups()
-            try:
-                date_obj = datetime(int(year), int(month), int(day))
-                if date_obj.year > 1600:
-                    str_time = date_obj.strftime('+%Y-%m-%dT00:00:00Z')
-                    #dates.append(Time(time=str_time, prop_nr='P570', precision=WikibaseTimePrecision.DAY))
-                    dates.append(create_time_dict('P570', str_time, WikibaseTimePrecision.DAY.value))
-            except ValueError:
-                pass
-        else:
-            date_match = re.search(r'\b(\d{4})\b', substring)
-            if date_match:
-                year = date_match.group(1)
-                try:
-                    year_int = int(year)
-                    if 1600 < year_int <= datetime.now().year:
-                        str_time = '+' + year + '-01-01T00:00:00Z'
-                        #dates.append(Time(time=str_time, prop_nr='P570', precision=WikibaseTimePrecision.YEAR))
-                        dates.append(create_time_dict('P570', str_time, WikibaseTimePrecision.YEAR.value))
-                except ValueError:
-                    pass
+    dates = []
+
+    # Pattern 1: narozen/a DD.MM.YYYY
+    birth_date_matches = re.finditer(r'\b(narozen|narozena)\s+(\d{1,2})\.\s*(\d{1,2})\.\s*(\d{4})\b', description,
+                                     re.IGNORECASE)
+    for match in birth_date_matches:
+        keyword, day, month, year = match.groups()
+        try:
+            date_obj = datetime(int(year), int(month), int(day))
+            if date_obj.year > 1600:
+                str_time = date_obj.strftime('+%Y-%m-%dT00:00:00Z')
+                dates.append(create_time_dict('P569', str_time, WikibaseTimePrecision.DAY.value))
+        except ValueError:
+            pass
+
+    # Pattern 2: narozen/a roku YYYY
+    birth_year_matches = re.finditer(r'\b(narozen|narozena)\s+roku\s+(\d{4})\b', description, re.IGNORECASE)
+    for match in birth_year_matches:
+        keyword, year = match.groups()
+        try:
+            year_int = int(year)
+            if 1600 < year_int <= datetime.now().year:
+                str_time = '+' + year + '-01-01T00:00:00Z'
+                dates.append(create_time_dict('P569', str_time, WikibaseTimePrecision.YEAR.value))
+        except ValueError:
+            pass
+
+    # Pattern 3: zemřel/a DD.MM.YYYY
+    death_date_matches = re.finditer(r'\b(zemřel|zemřela)\s+(\d{1,2})\.\s*(\d{1,2})\.\s*(\d{4})\b', description,
+                                     re.IGNORECASE)
+    for match in death_date_matches:
+        keyword, day, month, year = match.groups()
+        try:
+            date_obj = datetime(int(year), int(month), int(day))
+            if date_obj.year > 1600:
+                str_time = date_obj.strftime('+%Y-%m-%dT00:00:00Z')
+                dates.append(create_time_dict('P570', str_time, WikibaseTimePrecision.DAY.value))
+        except ValueError:
+            pass
+
+    # Pattern 4: zemřel/a roku YYYY
+    death_year_matches = re.finditer(r'\b(zemřel|zemřela)\s+roku\s+(\d{4})\b', description, re.IGNORECASE)
+    for match in death_year_matches:
+        keyword, year = match.groups()
+        try:
+            year_int = int(year)
+            if 1600 < year_int <= datetime.now().year:
+                str_time = '+' + year + '-01-01T00:00:00Z'
+                dates.append(create_time_dict('P570', str_time, WikibaseTimePrecision.YEAR.value))
+        except ValueError:
+            pass
 
     return dates if dates else None
 

@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime
 from typing import Union
 
@@ -16,7 +17,7 @@ from property_processor.property_processor_one import PropertyProcessorOne
 from tools import log_with_date_time, get_claim_from_item_by_property_wbi
 from wikibaseintegrator.datatypes import Item, ExternalID, Time, String
 
-
+log = logging.getLogger(__name__)
 class Processor:
 
     def __init__(self):
@@ -64,6 +65,7 @@ class Processor:
                 row_new_fields[column] = prepare_column_of_content(column, row_new_fields)
                 array_diff = []
                 time_fields = False
+                save_time = True
                 if type(row_new_fields[column]) is list:
                     for dt in row_new_fields[column]:
                         if type(dt) == dict and dt.get('property') in ['P569', 'P570']:
@@ -83,26 +85,31 @@ class Processor:
                                     if (row.get('property') in ['P570']):
                                         del(row_new_fields[column][row_key])
                         else:
-                            if (len(birth) > 0):
-                                if (row_new_fields[column].get('property') in ['P569']):
-                                    del(row_new_fields[column])
-                            if (len(death) > 0):
-                                if (row_new_fields[column].get('property') in ['P570']):
-                                    del(row_new_fields[column])
+                            pass
                         if len(row_new_fields[column]) == 0:
-                            self.save = False
+                            save_time = False
                 if (type(row_new_fields[column]) == dict and row_new_fields[column].get('property') in ['P569', 'P570']):
+                    birth = wd_data['birth']
+                    death = wd_data['death']
+                    if (len(birth) > 0 and len(row_new_fields[column]) > 0):
+                        if (row_new_fields[column].get('property') in ['P569']):
+                            row_new_fields[column] = ''
+                    if (len(death) > 0 and len(row_new_fields[column]) > 0):
+                        if (row_new_fields[column].get('property') in ['P570']):
+                            row_new_fields[column] = ''
+                    if type(row_new_fields[column]) != dict:
+                        save_time = False
                     time_fields = True
+
                 if (self.save
                         and (
                             (type(row_new_fields[column]) == str and row_new_fields[column] not in claims and len(row_new_fields[column]) > 0)
                             or
                             (type(row_new_fields[column]) == list and len(array_diff) > 0 and not time_fields)
                             or
-                            (type(row_new_fields[column]) == Time)
-                            or
                             (time_fields)
                         )
+                    and save_time
                 ):
 
                     if self.item is None:
@@ -180,8 +187,8 @@ class Processor:
             except ValueError as ve:
                 log_with_date_time(str(ve))
                 pass
-            except KeyError:
-                # log_with_date_time(str(ke))
+            except KeyError as ke:
+                log_with_date_time(str(ke))
                 pass
 
     def set_nkcr_aut(self, nkcr_aut):
@@ -211,8 +218,9 @@ class Processor:
         qid = self.qid
         item = self.item
         row = self.row
-
+        # log.info('start_proc')
         if nkcr_aut in non_deprecated_items:
+
             exist_qid = non_deprecated_items[nkcr_aut]['qid']
             if exist_qid != '':
                 exist_qid = clean_qid(exist_qid)
@@ -229,6 +237,7 @@ class Processor:
                 self.process_new_fields_wbi(None, non_deprecated_items[nkcr_aut], row, item)
         else:
             d = ''
+        # log.info('end_proc')
 
     def process_date_type(self, non_deprecated_items):
 

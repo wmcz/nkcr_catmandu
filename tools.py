@@ -598,7 +598,7 @@ def get_claim_from_item_by_property(datas: dict[str, Any], property_of_item: str
     return claims_from_data
 
 
-def get_claim_from_item_by_property_wbi(datas: ItemEntity, property_of_item: list) -> list:
+def get_claim_from_item_by_property_wbi(datas: ItemEntity, property_of_item: Any) -> list:
     if type(property_of_item) is list:
         claims_from_data = []
         for prop in property_of_item:
@@ -611,7 +611,7 @@ def get_claim_from_item_by_property_wbi(datas: ItemEntity, property_of_item: lis
                     claims_from_data.append(claim.mainsnak.datavalue['value'])
                 elif claim.mainsnak.datatype == WikibaseDatatype.TIME.value:
                     value: dict = claim.mainsnak.datavalue['value']
-                    value.update({'property': prop})
+                    # value.update({'property': prop})
                     claims_from_data.append(value)
                 else:
                     claims_from_data.append(claim.mainsnak.datavalue['value']['id'])
