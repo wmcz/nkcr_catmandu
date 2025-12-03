@@ -1,7 +1,7 @@
 class Config:
     user_name: str = 'Frettiebot'
     debug: bool = False
-    use_json_database: bool = True
+    use_json_database: bool = False
     count_first_step: int = 0
     count_second_step: int = 0
 
