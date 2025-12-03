@@ -194,11 +194,14 @@ def prepare_date_from_date_field(date: Any, column) -> Union[None, dict]:
     return None
 
 def prepare_date_from_description(description: str, column) -> Union[list[dict], None]:
+    if (type(description) != str):
+        return []
     dates = []
     # Regex for narozena/narozen
+    # print(description)
     birth_matches = re.finditer(r'\b(narozen|narozena)\b', description, re.IGNORECASE)
     for birth_match in birth_matches:
-        substring = description[birth_match.end():]
+        substring = description[birth_match.end():birth_match.end() + 20]
         date_match = re.search(r'(\d{1,2})\.\s*(\d{1,2})\.\s*(\d{4})', substring)
         if date_match:
             day, month, year = date_match.groups()
@@ -226,7 +229,7 @@ def prepare_date_from_description(description: str, column) -> Union[list[dict],
     # Regex for zemrel/zemrela
     death_matches = re.finditer(r'\b(zemřel|zemřela)\b', description, re.IGNORECASE)
     for death_match in death_matches:
-        substring = description[death_match.end():]
+        substring = description[death_match.end():death_match.end() + 20]
         date_match = re.search(r'(\d{1,2})\.\s*(\d{1,2})\.\s*(\d{4})', substring)
         if date_match:
             day, month, year = date_match.groups()

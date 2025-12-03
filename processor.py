@@ -70,9 +70,27 @@ class Processor:
                             time_fields = True
                     if not time_fields:
                         array_diff = set(row_new_fields[column]) - set(claims)
-                    # else:
-                    #     if len(claims):
-                    #         self.save = False
+                    else:
+                        birth = wd_data['birth']
+                        death = wd_data['death']
+                        if type(row_new_fields[column]) is list:
+                            if (len(birth) > 0):
+                                for row_key, row in enumerate(row_new_fields[column]):
+                                    if (row.get('property') in ['P569']):
+                                        del(row_new_fields[column][row_key])
+                            if (len(death) > 0):
+                                for row_key, row in enumerate(row_new_fields[column]):
+                                    if (row.get('property') in ['P570']):
+                                        del(row_new_fields[column][row_key])
+                        else:
+                            if (len(birth) > 0):
+                                if (row_new_fields[column].get('property') in ['P569']):
+                                    del(row_new_fields[column])
+                            if (len(death) > 0):
+                                if (row_new_fields[column].get('property') in ['P570']):
+                                    del(row_new_fields[column])
+                        if len(row_new_fields[column]) == 0:
+                            self.save = False
                 if (type(row_new_fields[column]) == dict and row_new_fields[column].get('property') in ['P569', 'P570']):
                     time_fields = True
                 if (self.save
