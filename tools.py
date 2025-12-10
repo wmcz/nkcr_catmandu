@@ -27,6 +27,18 @@ log = logging.getLogger(__name__)
 
 
 def write_log(fields, create_file=False):
+    """
+    Writes a log entry to a CSV file and a logger. The function either appends to or creates a
+    new CSV file depending on the specified flag.
+
+    :param fields: The dictionary containing field names as keys and corresponding values to
+        be written to the log file.
+    :type fields: dict
+    :param create_file: Optional boolean flag that determines whether to create a new CSV file
+        or append to an existing file. Defaults to False (append mode).
+    :type create_file: bool
+    :return: None
+    """
     if create_file:
         csvfile = open('debug.csv', 'w')
     else:
@@ -38,17 +50,43 @@ def write_log(fields, create_file=False):
 
 
 def reset_debug_file():
+    """
+    Resets the content of the debug file by creating or overwriting it.
+
+    This function opens a file named 'debug.csv' in write mode, effectively clearing
+    any existing content or creating the file if it does not already exist.
+    The file is then closed immediately, ensuring no further action is performed.
+
+    :return: None
+    """
     csvfile = open('debug.csv', 'w')
     csvfile.close()
 
 
 def read_log() -> csv.DictReader:
+    """
+    Reads data from a CSV file and returns a CSV dictionary reader object. This function opens a file
+    named 'debug.csv' in read mode and uses the `csv.DictReader` class to parse the file's content.
+    The expected fields in the CSV file are 'item', 'prop', and 'value'.
+
+    :return: A CSV dictionary reader to iterate over rows of the input file, where each row is
+             represented as a dictionary with keys corresponding to 'item', 'prop', and 'value'.
+    :rtype: csv.DictReader
+    """
     csvfile = open('debug.csv', 'r')
     reader = csv.DictReader(csvfile, fieldnames=['item', 'prop', 'value'])
     return reader
 
 
 def print_info(debug: bool):
+    """
+    Prints information and logs messages with a timestamp. The behavior differs
+    based on the `debug` flag.
+
+    :param debug: A boolean flag indicating whether to include additional debugging
+        information in the log.
+    :return: None
+    """
     log_with_date_time('Catmandu processor for NKČR')
     if debug:
         log_with_date_time('DEBUG!!!')
@@ -58,7 +96,27 @@ def add_new_field_to_item_wbi(
         item_new_field: ItemEntity,
         property_new_field: str, value: Union[str, int],
         nkcr_aut_new_field: str):
+    """
+    Adds a new claim to an item in the Wikibase system.
 
+    This function attempts to add a new field to an item. It checks the current
+    claims of the item to ensure that deprecated claims matching the provided
+    `nkcr_aut_new_field` do not result in duplicate or conflicting data being
+    added. The function also handles different types of property values, such
+    as strings, external IDs, or time-based properties. Appropriate references
+    are created for the newly added claims.
+
+    :param item_new_field: The Wikibase item to which the new claim will be added.
+    :param property_new_field: The property for the new claim, represented as its
+        string identifier (e.g., 'P213', 'P496').
+    :param value: The value for the new claim. For string or integer properties,
+        this is a simple value, while for time properties, this is a dictionary
+        containing `property`, `time`, and `precision` keys.
+    :param nkcr_aut_new_field: The external identifier or reference to be checked
+        against existing claims for potential deprecation.
+    :return: The modified Wikibase item containing the newly added claim.
+    :rtype: ItemEntity
+    """
     try:
         claims_by_property = item_new_field.claims.get('P691')
         for claim in claims_by_property:
@@ -79,10 +137,11 @@ def add_new_field_to_item_wbi(
     ]
 
     if property_new_field in ['P213', 'P496']:
-        # string
+        # external string
         final = {'item': item_new_field.id, 'prop': property_new_field, 'value': value}
         new_claim = ExternalID(value=value, prop_nr=property_new_field, references=references)
     elif property_new_field in ['P569', 'P570'] or property_new_field == ['P569', 'P570']:
+        #Time
         final = {'item': item_new_field.id, 'prop': value.get('property'), 'value': value.get('time')}
         new_claim = Time(time=value.get('time'), prop_nr=value.get('property'), precision=value.get('precision'), references=references)
     else:
@@ -93,45 +152,27 @@ def add_new_field_to_item_wbi(
 
     return item_new_field
 
-
-def add_nkcr_aut_to_item(debug: bool, repo: pywikibot_extension.MyDataSite, item_to_add: pywikibot.ItemPage,
-                         nkcr_aut_to_add: str, name_to_add: str):
-    now = datetime.now()
-
-    sources = []
-
-    source_date = pywikibot.Claim(repo, 'P813')
-    source_date.setTarget(pywikibot.WbTime(year=now.year, month=now.month, day=now.day))
-
-    source_nkcr = pywikibot.Claim(repo, 'P248')
-    source_nkcr.setTarget(pywikibot.ItemPage(repo, 'Q13550863'))
-
-    source_nkcr_aut = pywikibot.Claim(repo, 'P691')
-    source_nkcr_aut.setTarget(nkcr_aut_to_add)
-
-    new_claim = pywikibot.Claim(repo, 'P691')
-    new_claim.setTarget(nkcr_aut_to_add)
-
-    qualifier = pywikibot.Claim(repo, 'P1810')
-    qualifier.setTarget(clean_last_comma(name_to_add))
-    if debug:
-        final = {'item': item_to_add.getID(), 'prop': 'P691', 'value': nkcr_aut_to_add}
-        write_log(final)
-        # print(final)
-    else:
-        sources.append(source_nkcr)
-        sources.append(source_nkcr_aut)
-        sources.append(source_date)
-        new_claim.addSources(sources)
-        new_claim.addQualifier(qualifier)
-        item_to_add.addClaim(new_claim, tags=['Czech-Authorities-Sync'])
-
-
 def add_nkcr_aut_to_item_wbi(
         item_to_add: ItemEntity,
         nkcr_aut_to_add: str,
         name_to_add: str):
+    """
+    Adds an NKCR AUT identifier to a Wikibase item along with references and qualifiers.
 
+    This function updates the provided `Wikibase item` with the given NKCR AUT (National Library
+    of the Czech Republic Authority) identifier. It also attaches relevant metadata, including the
+    source reference ('P248'), the identifier value ('P691'), and a date stamp ('P813'), as well
+    as an optional qualifier ('P1810') for the name.
+
+    :param item_to_add: The Wikibase item to which the NKCR AUT identifier will be added.
+    :type item_to_add: ItemEntity
+    :param nkcr_aut_to_add: The NKCR AUT identifier string to be added to the item.
+    :type nkcr_aut_to_add: str
+    :param name_to_add: The formatted name string to be included as a qualifier.
+    :type name_to_add: str
+    :return: The updated Wikibase item containing the new claim.
+    :rtype: ItemEntity
+    """
     now = datetime.now()
 
     references = [
@@ -154,16 +195,22 @@ def add_nkcr_aut_to_item_wbi(
     return item_to_add
 
 
-def get_nkcr_auts_from_item(datas) -> list:
-    nkcr_auts_from_data = []
-    claims_from_wd = datas['claims'].get('P691', [])
-    for claim in claims_from_wd:
-        nkcr_auts_from_data.append(claim.getTarget())
-
-    return nkcr_auts_from_data
-
-
 def get_nkcr_auts_from_item_wbi(datas) -> list:
+    """
+    Extracts NKCR AUT IDs from a given Wikibase item.
+
+    This function processes the claims associated with the input data to retrieve
+    NKCR AUT identifiers (external IDs) from the specified property `P691`. These
+    identifiers are either extracted directly or from a nested literal value.
+
+    :param datas: The input data representing a Wikibase item. It contains claims
+        and associated metadata.
+    :type datas: Any
+
+    :return: A list of NKCR AUT IDs extracted from the provided data. If no IDs
+        are found, an empty list is returned.
+    :rtype: list
+    """
     nkcr_auts_from_data = []
     try:
         claims_from_wd = datas.claims.get('P691')
@@ -179,6 +226,22 @@ def get_nkcr_auts_from_item_wbi(datas) -> list:
 
 
 def make_qid_database(items: dict) -> dict[str, list[str]]:
+    """
+    Creates a database mapping QIDs to lists of NKCR identifiers. This function takes
+    a dictionary where each key is an NKCR identifier, and each value is a dictionary
+    containing at least a 'qid' key. It processes these entries to create a new
+    dictionary where each QID is a key mapped to a list of NKCR identifiers associated
+    with that QID.
+
+    :param items: A dictionary mapping NKCR identifiers to dictionaries. Each
+        dictionary value must contain a 'qid' key which provides the QID
+        associated with the NKCR identifier.
+    :type items: dict
+
+    :return: A dictionary where each QID is mapped to a list of NKCR identifiers
+        that share the same QID.
+    :rtype: dict[str, list[str]]
+    """
     return_qids: dict[str, list[str]] = {}
     for nkcr, nkcr_line in items.items():
         if return_qids.get(nkcr_line['qid']):
@@ -190,6 +253,15 @@ def make_qid_database(items: dict) -> dict[str, list[str]]:
 
 
 def get_occupations(limit: Union[int, None] = None, offset: Union[int, None] = None) -> dict[str, str]:
+    """
+    Retrieves a dictionary of unique occupations from a SPARQL query by filtering specific
+    prefixes and ensuring only non-deprecated rankings are included. Occupation data includes
+    an identifier value and a string representation for display.
+
+    :param limit: The maximum number of occupations to retrieve. If None, no limit is applied.
+    :param offset: The number of occupations to skip from the start of the query result. If None, no offset is applied.
+    :return: A dictionary where keys are strings (occupation names) and values are occupation item identifiers.
+    """
     query = """
     select distinct ?item ?value ?string where {
 
@@ -228,6 +300,24 @@ def get_occupations(limit: Union[int, None] = None, offset: Union[int, None] = N
 
 def get_all_non_deprecated_items(limit: Union[int, None] = None, offset: Union[int, None] = None) -> dict[
     dict[str, list, list]]:
+    """
+    Retrieve non-deprecated items from a SPARQL endpoint, including optional metadata such as ISNI, ORCID, birth, and
+    death information.
+
+    The function queries a SPARQL endpoint (assumed to be Wikidata's query service) to return a dictionary of non-deprecated
+    items, including metadata retrieved for each item. Metadata includes ISNI, ORCID, birth date, and death date,
+    all of which are optional. The query skips items marked with a deprecated rank.
+
+    :param limit: The maximum number of items to include in the query result. If set to None, no limit is applied.
+    :param offset: The offset for the query to support pagination. If set to None, querying starts from the first item.
+    :return: A dictionary where each key is an NKCR identifier and the corresponding value is a dictionary with various
+             metadata fields. Metadata includes:
+             - 'qid' (str): The Wikidata QID of the item.
+             - 'isni' (list): A list of ISNI identifiers associated with the item.
+             - 'orcid' (list): A list of ORCID identifiers associated with the item.
+             - 'birth' (list): A list of birth dates associated with the item.
+             - 'death' (list): A list of death dates associated with the item.
+    """
     non_deprecated_dictionary: dict[dict[str, list, list]] = {}
 
     query = """
@@ -241,8 +331,6 @@ def get_all_non_deprecated_items(limit: Union[int, None] = None, offset: Union[i
     } LIMIT """ + str(limit) + """ OFFSET """ + str(offset) + """
     """
 
-    # query_object = sparql.SparqlQuery()
-    # query_object = mySparql.MySparqlQuery()
     query_object = mySparql.MySparqlQuery(endpoint="https://query-main.wikidata.org/sparql",
                                           entity_url='http://www.wikidata.org/entity/')
     try:
@@ -330,6 +418,18 @@ def get_all_non_deprecated_items(limit: Union[int, None] = None, offset: Union[i
 
 
 def get_all_non_deprecated_items_occupation(limit: Union[int, None] = None, offset: Union[int, None] = None) -> dict[dict[str, list, list]]:
+    """
+    Retrieves a dictionary containing non-deprecated items and their associated occupations based on the given
+    `limit` and `offset` values. This function queries a SPARQL endpoint to fetch the data.
+
+    :param limit: The maximum number of items to retrieve. If None, no limit is applied.
+    :type limit: Union[int, None]
+    :param offset: The number of items to skip before starting to retrieve the data. If None, no offset is applied.
+    :type offset: Union[int, None]
+    :return: A dictionary where the keys are NKCR codes and the values are dictionaries containing `qid`
+        for the Wikidata ID and a list of occupations.
+    :rtype: dict[dict[str, list, list]]
+    """
     non_deprecated_dictionary: dict[dict[str, list, list]] = {}
 
     query = """
@@ -395,6 +495,24 @@ def get_all_non_deprecated_items_occupation(limit: Union[int, None] = None, offs
 
 
 def get_all_non_deprecated_items_field_of_work_and_occupation(limit: Union[int, None] = None, offset: Union[int, None] = None) -> dict[dict[str, list, list]]:
+    """
+    Fetches non-deprecated records of items including their respective fields of work and occupations from a SPARQL endpoint.
+
+    This function queries the given SPARQL endpoint for non-deprecated items, retrieves their QIDs,
+    and optionally their fields of work (`P101`) and occupations (`P106`). The results are aggregated
+    into a nested dictionary, where each key is the `nkcr` value of an item, and each value is a dictionary
+    containing the `qid`, list of `field` identifiers, and list of `occup` identifiers.
+
+    :param limit: Specifies the maximum number of results to fetch. If None, no limit is applied.
+    :type limit: Union[int, None]
+    :param offset: Specifies the starting point for result fetching. Useful for pagination. If None, results
+                   start from the beginning of the dataset.
+    :type offset: Union[int, None]
+    :return: A dictionary where keys are `nkcr` identifiers (non-deprecated items) and values are dictionaries
+             containing the item's QID, a list of field of work identifiers (`field`), and a list of occupation
+             identifiers (`occup`).
+    :rtype: dict[dict[str, list, list]]
+    """
     non_deprecated_dictionary: dict[dict[str, list, list]] = {}
 
     query = """
@@ -472,6 +590,23 @@ def get_all_non_deprecated_items_field_of_work_and_occupation(limit: Union[int, 
 
 
 def get_all_non_deprecated_items_places(limit: Union[int, None] = None, offset: Union[int, None] = None) -> dict[dict[str, list, list]]:
+    """
+    Fetches a dictionary of non-deprecated items and some of their associated properties from a SPARQL query.
+
+    The function queries a SPARQL endpoint, filtering out deprecated entities, and retrieves a set of data that includes
+    items, NKCR IDs, and optionally associated birthplaces, death places, and workplaces. Data is returned as a dictionary
+    organized by NKCR IDs.
+
+    :param limit: Maximum number of items to fetch from the query. If None, no limit is applied.
+    :type limit: Union[int, None]
+    :param offset: Number of initial items from the query to skip over. If None, no offset is applied.
+    :type offset: Union[int, None]
+
+    :return: A nested dictionary containing non-deprecated items. Each item is keyed by its NKCR ID and contains
+        sub-dictionaries with attributes such as 'qid', 'birth', 'death', and 'work'. Each attribute stores lists of
+        corresponding data.
+    :rtype: dict[dict[str, list, list]]
+    """
     non_deprecated_dictionary: dict[dict[str, list, list]] = {}
 
     query = """
@@ -562,6 +697,20 @@ def get_all_non_deprecated_items_places(limit: Union[int, None] = None, offset: 
 
 
 def load_nkcr_items(file_name) -> pandas.DataFrame:
+    """
+    Reads a CSV file containing NKCR item data and returns it as a pandas DataFrame.
+
+    This function is used to load large datasets containing bibliographic or authority
+    record information into chunks with specified data types for each column. It uses
+    pandas' `read_csv` method for efficient data loading and supports chunks of data
+    for processing large files that may not fit entirely into memory.
+
+    :param file_name: The path to the CSV file containing NKCR item data.
+    :type file_name: str
+
+    :return: A generator yielding pandas DataFrame chunks of the loaded data.
+    :rtype: pandas.DataFrame
+    """
     data_csv = pd.read_csv(file_name, dtype={
         '_id': 'S',
         '100a': 'S',
@@ -588,17 +737,21 @@ def load_nkcr_items(file_name) -> pandas.DataFrame:
     # data_csv.fillna('', inplace=True)
     return data_csv
 
-
-def get_claim_from_item_by_property(datas: dict[str, Any], property_of_item: str) -> list:
-    claims_from_data = []
-    claims_by_property = datas['claims'].get(property_of_item, [])
-    for claim in claims_by_property:
-        claims_from_data.append(claim.getTarget())
-
-    return claims_from_data
-
-
 def get_claim_from_item_by_property_wbi(datas: ItemEntity, property_of_item: Any) -> list:
+    """
+    Extracts claims from a given ItemEntity based on provided property or list of properties. The claims are filtered
+    and processed based on the datatype of each claim's mainsnak.
+
+    :param datas: The ItemEntity object containing the claims to process.
+    :type datas: ItemEntity
+    :param property_of_item: The property or list of properties to filter claims within the ItemEntity. Can be a single
+        property or a list of properties.
+    :type property_of_item: Any
+    :return: A list of extracted claim values from the ItemEntity, processed based on their datatype. For EXTERNALID
+        and TIME datatypes, specific processing is applied. For TIME datatype, when a single property is provided, the
+        property is included in the returned result.
+    :rtype: list
+    """
     if type(property_of_item) is list:
         claims_from_data = []
         for prop in property_of_item:
@@ -635,27 +788,21 @@ def get_claim_from_item_by_property_wbi(datas: ItemEntity, property_of_item: Any
 
         return claims_from_data
 
-
-def is_item_subclass_of(item: pywikibot.ItemPage, subclass: pywikibot.ItemPage):
-    query = """
-    select ?item where  {
-        values ?item {wd:""" + item.getID() + """}
-        ?item wdt:P31/wdt:P279* wd:""" + subclass.getID() + """ .
-    }
-    """
-
-    # query_object = mySparql.MySparqlQuery()
-    query_object = mySparql.MySparqlQuery(endpoint="https://query-main.wikidata.org/sparql",
-                                          entity_url='http://www.wikidata.org/entity/')
-    data_is_subclass = query_object.select(query=query, full_data=False)
-    if len(data_is_subclass) == 0:
-        # not subclass of
-        return False
-    else:
-        return True
-
-
 def is_item_subclass_of_wbi(item_qid: str, subclass_qid: str):
+    """
+    Determines whether a given Wikidata item is a subclass of another specified item.
+    The function checks if the given `item_qid` is either a direct or indirect subclass
+    of the given `subclass_qid`. The relationship can be through multiple levels within
+    the Wikidata property hierarchy. A cache mechanism is utilized to enhance performance
+    by storing previous results.
+
+    :param item_qid: The QID of the item being checked (e.g., "Q42" for Douglas Adams).
+    :type item_qid: str
+    :param subclass_qid: The QID of the potential superclass item (e.g., "Q36180" for human).
+    :type subclass_qid: str
+    :return: `True` if `item_qid` is a subclass of `subclass_qid`, otherwise `False`.
+    :rtype: bool
+    """
     try:
         cached = cleaners.cachedData[subclass_qid][item_qid]
         return cached
@@ -720,10 +867,37 @@ def is_item_subclass_of_wbi(item_qid: str, subclass_qid: str):
 
 
 def log_with_date_time(message: str = ''):
+    """
+    Logs a message with the current date and time stamp.
+
+    This function uses the logging module to log a given message along with
+    the current date and time. If no message is provided, an empty string
+    will be logged.
+
+    :param message: The message to log. Defaults to an empty string.
+    :type message: str
+    :return: None
+    """
     log.info(message)
 
 
 def load_sparql_query_by_chunks(limit: int, get_method, name: str):
+    """
+    Loads SPARQL query results in chunks, processes them in a paginated manner, and stores the results
+    either in memory or as a JSON file. If the results are already cached in a JSON file and caching
+    is enabled, the function retrieves them directly from the file.
+
+    :param limit: The maximum number of records to be fetched in each chunk.
+    :type limit: int
+    :param get_method: The method used to retrieve the data in chunks. It must take `limit`
+                       and `offset` as arguments and return a chunk of data.
+    :type get_method: Callable
+    :param name: The base name of the JSON file used for caching the query results. The `.json`
+                 extension will be appended automatically.
+    :type name: str
+    :return: A dictionary containing the aggregated SPARQL query results.
+    :rtype: dict
+    """
     if Config.use_json_database:
         if os.path.isfile(name + '.json'):
             infile = open(name + '.json')
@@ -761,6 +935,17 @@ def load_sparql_query_by_chunks(limit: int, get_method, name: str):
 
 
 def load_language_dict_csv() -> dict:
+    """
+    Loads a language dictionary from a CSV file.
+
+    This function reads a CSV file containing language codes and their
+    corresponding items. It constructs and returns a dictionary where keys
+    are language codes and values are the corresponding items. The CSV file
+    is expected to have columns 'item' and 'kod'.
+
+    :return: A dictionary mapping language codes (``kod``) to items (``item``).
+    :rtype: dict
+    """
     filename = download_language_dict_csv()
     data_csv = pd.read_csv(filename, dtype={
         'item': 'S',
@@ -774,6 +959,19 @@ def load_language_dict_csv() -> dict:
 
 
 def download_language_dict_csv() -> str:
+    """
+    Downloads a language dictionary CSV file from a remote URL.
+
+    This function retrieves a CSV file containing language data from the specified
+    remote URL and saves it locally with a predefined filename. If the download
+    fails due to a connection error, it returns the name of a default file instead.
+
+    :raises requests.ConnectionError: If there's an issue with the network connection
+        preventing the file download.
+    :return: The filename of the downloaded CSV file or the default filename
+        in case of connection failure.
+    :rtype: str
+    """
     url = "https://raw.githubusercontent.com/wmcz/WMCZ-scripts/main/jazyky.csv"
     filename = 'jazyky.csv'
 
@@ -792,6 +990,25 @@ def download_language_dict_csv() -> str:
 
 def get_all_non_deprecated_items_languages(limit: Union[int, None] = None, offset: Union[int, None] = None) -> dict[
     dict[str, list, list]]:
+    """
+    Fetches all non-deprecated items and their respective languages from a Wikidata endpoint.
+
+    This function constructs and executes a SPARQL query to retrieve non-deprecated items
+    along with their corresponding languages from the specified endpoint. The results are
+    processed and returned as a dictionary, where each key is an item's identifier (NKCR
+    identifier), and the values contain the item's QID and a list of associated languages.
+
+    :param limit: Specifies the maximum number of results to retrieve. If None, no limit
+        is applied.
+    :param offset: Specifies the offset for paginated results. If None, no offset is applied.
+    :return: A dictionary where each key represents an NKCR identifier, and the value is
+        another dictionary containing the item's QID and a list of associated languages.
+        Example structure:
+            {
+              "nkcr_id_1": {"qid": "Q12345", "language": ["en", "cs"]},
+              "nkcr_id_2": {"qid": "Q67890", "language": []},
+            }
+    """
     non_deprecated_dictionary: dict[dict[str, list, list]] = {}
 
     query = """
@@ -843,14 +1060,35 @@ def get_all_non_deprecated_items_languages(limit: Union[int, None] = None, offse
     return non_deprecated_dictionary
 
 def get_bot_password(filename):
+    """
+    Reads the first line of a given file to obtain the bot password.
+
+    The function opens the specified file, reads its first line, and
+    returns the content of that line. It assumes the file exists and
+    is readable. This is useful for retrieving sensitive data such
+    as passwords from files in a consistent manner.
+
+    :param filename: The path to the file containing the bot password.
+    :type filename: str
+    :return: The first line of the file, typically the bot password.
+    :rtype: str
+    """
     with open(filename, 'r') as file:
         first_line = file.readline()
     return first_line
 
 def first_name(name):
     """
-            Returns the title of the record (245 $a an $b).
-            """
+    Extracts and returns the first name from a given string. The function parses the input string
+    to determine the first name using various string manipulations and regex. If the input is not
+    a valid string or cannot be parsed, it returns None.
+
+    :param name: The full name input string to be parsed.
+    :type name: str
+    :return: The parsed first name from the input string or None if input is invalid or
+        parsing fails.
+    :rtype: Optional[str]
+    """
     try:
         assert isinstance(name, str)
         splits = name.replace(',','').split(' ')
@@ -876,8 +1114,18 @@ def first_name(name):
 
 def last_name(name):
     """
-            Returns the title of the record (245 $a an $b).
-            """
+    Extracts the last name from a given name string.
+
+    This function attempts to identify and return the last name from a provided
+    string, handling cases where names may include commas, extra spaces, or
+    special characters. It uses regular expressions to parse names into their
+    components and returns the portion corresponding to the last name.
+
+    :param name: The full name string to process.
+    :type name: str
+    :return: The last name extracted from the input string, or None if extraction fails.
+    :rtype: str or None
+    """
     try:
         assert isinstance(name, str)
         splits = name.replace(',', '').split(' ')

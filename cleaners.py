@@ -17,12 +17,35 @@ log = logging.getLogger(__name__)
 
 
 def clean_last_comma(string: str) -> str:
+    """
+    Removes the trailing comma from the end of a given string, if present.
+
+    This function checks if the input string ends with a comma. If a trailing comma
+    is found, it removes the comma and returns the modified string. If the string
+    does not end with a comma, the function returns the string unchanged.
+
+    :param string: The input string to process.
+    :type string: str
+    :return: The string with the trailing comma removed, if it was present.
+    :rtype: str
+    """
     if string.endswith(','):
         return string[:-1]
     return string
 
 
 def clean_qid(string: str) -> str:
+    """
+    Cleans a QID string by removing parentheses and verifying its validity. A QID is ensured to
+    start with the letter 'Q', followed by one or more digits, and matches a specific regex pattern.
+
+    :param string: The input QID string that needs to be cleaned and validated.
+    :type string: str
+    :return: The cleaned QID string if valid.
+    :rtype: str
+    :raises BadItemException: If the input string does not start with 'Q' or if it doesn't match
+        the expected QID pattern.
+    """
     string = string.replace(')', '').replace('(', '')
     first_letter = string[0]
     if first_letter.upper() != 'Q':
@@ -38,6 +61,17 @@ def clean_qid(string: str) -> str:
 
 
 def prepare_orcid_from_nkcr(orcid: str, column) -> str:
+    """
+    Prepare a properly formatted ORCID string from the given input by validating and
+    removing unwanted spaces.
+
+    :param orcid: The input string representing the ORCID ID.
+    :type orcid: str
+    :param column: Unused input parameter that serves as a placeholder.
+    :return: A correctly formatted ORCID string if validation succeeds,
+        otherwise an empty string.
+    :rtype: str
+    """
     # https://pythonexamples.org/python-split-string-into-specific-length-chunks/
     orcid = orcid.replace(' ', '')
     regex = u"^(\d{4}-){3}\d{3}(\d|X)$"
@@ -50,6 +84,16 @@ def prepare_orcid_from_nkcr(orcid: str, column) -> str:
 
 
 def prepare_occupation_from_nkcr(occupation_string: str, column) -> Union[str, list]:
+    """
+    Transforms an occupation string by mapping it to its corresponding identifier(s) based on the
+    `nkcr_to_qid` dictionary. This function processes a pipe-separated string of occupations and
+    returns a list of identifiers for valid occupations.
+
+    :param occupation_string: A pipe-separated string of occupations to be transformed.
+    :param column: An unused parameter included in the function signature.
+    :return: A list of identifiers (QIDs) corresponding to the valid occupations found in the input
+        string. Returns an empty list if the input string is empty or if no valid occupations are found.
+    """
     nkcr_to_qid = name_to_nkcr
     occupations = []
     # log_with_date_time(occupation_string)
@@ -78,6 +122,19 @@ def prepare_occupation_from_nkcr(occupation_string: str, column) -> Union[str, l
     return occupations
 
 def prepare_language_from_nkcr(language_string: str, column) -> Union[str, list]:
+    """
+    Prepares a list of languages mapped to a specific identifier based on the input string
+    and the `nkcr_to_qid` mapping dictionary. The input string is split by a delimiter,
+    and each resulting language is checked against the dictionary. If a match exists,
+    it is appended to the result list. If no match exists, a warning is logged.
+
+    :param language_string: The input string containing language identifiers, separated
+        by a `$` delimiter.
+    :param column: Unused parameter, included for potential future use or interface
+        consistency.
+    :return: A list of identifiers corresponding to the languages found in the input
+        string, or an empty list if no valid languages are found.
+    """
     nkcr_to_qid = language_dict
     languages = []
     # log_with_date_time(occupation_string)
@@ -106,6 +163,20 @@ def prepare_language_from_nkcr(language_string: str, column) -> Union[str, list]
     return languages
 
 def prepare_places_from_nkcr(place_string: str, column) -> Union[str, list]:
+    """
+    Prepares a list of normalized place identifiers (QIDs) based on a provided place string. The function
+    processes the input to handle specific delimiters and applies corrections to ensure proper formatting.
+    It then attempts to map the processed place names to corresponding QIDs using a predefined name-to-ID
+    mapping.
+
+    :param place_string: A string containing place names, potentially separated by delimiters.
+                         Place names might need normalization for proper identification.
+    :type place_string: str
+    :param column: Additional context parameter (not currently used in function logic).
+    :return: A list containing the QIDs of the places found in the input string, or an empty list
+             if none are found or the input is invalid.
+    :rtype: list
+    """
     nkcr_to_qid = name_to_nkcr
     places: list = []
     # log_with_date_time(occupation_string)
@@ -151,6 +222,18 @@ def prepare_places_from_nkcr(place_string: str, column) -> Union[str, list]:
 
 
 def prepare_isni_from_nkcr(isni: str, column) -> str:
+    """
+    Prepares an International Standard Name Identifier (ISNI) from a given string in
+    NKCR format. The function removes spaces from the input string and verifies if
+    it conforms to the correct ISNI format using a regular expression. If valid,
+    it formats the string into 4-character chunks concatenated back together.
+
+    :param isni: A string representing the ISNI in raw or NKCR format.
+    :type isni: str
+    :param column: An unused parameter for additional input (if needed in the future).
+    :return: A reformatted ISNI string if valid, otherwise an empty string.
+    :rtype: str
+    """
     # https://pythonexamples.org/python-split-string-into-specific-length-chunks/
     isni = isni.replace(' ', '')
     regex = u"^(\d{16})$"
@@ -164,7 +247,24 @@ def prepare_isni_from_nkcr(isni: str, column) -> str:
         return ''.join(str_chunks)
 
 def create_time_dict(property, time_string: str, precision: int, timezone: int = 0, calendar_model: str = 'http://www.wikidata.org/entity/Q1985727') -> dict:
+    """
+    Creates a dictionary representing a time value with specific attributes.
 
+    This function generates a dictionary structured to include attributes such
+    as time string, timezone, precision, calendar model, and a property
+    identifier. It is typically used for creating structured temporal data.
+
+    :param property: A property used to describe the context or identifier
+        associated with the time value.
+    :param time_string: A string representing the time value in a specific format.
+    :param precision: An integer indicating the precision level of the time value.
+    :param timezone: An optional integer representing the timezone offset
+        from UTC, defaulting to 0.
+    :param calendar_model: An optional string representing the calendar model
+        URL, defaulting to 'http://www.wikidata.org/entity/Q1985727'.
+    :return: A dictionary containing the structured time value with its
+        associated attributes.
+    """
     return {
         'time' : time_string,
         'timezone' : timezone,
@@ -176,6 +276,20 @@ def create_time_dict(property, time_string: str, precision: int, timezone: int =
     }
 
 def prepare_date_from_date_field(date: Any, column) -> Union[None, dict]:
+    """
+    Prepares a date value from a given field by formatting it according to the Wikibase
+    date format and returning a structured dictionary. Handles different date precisions
+    (e.g., year, day) based on the input value length. Uses a property identifier based
+    on the column input.
+
+    :param date: The input date value to format. Can be a string in 'YYYY' or 'YYYYMMDD'
+        format or any other type.
+    :param column: The column identifier used to determine the corresponding property
+        from the configuration.
+    :return: A dictionary representing the formatted date with property identifier
+        and precision, or None if the input is invalid.
+    :rtype: Union[None, dict]
+    """
     #První místo kam se podívat: Pole 046f (narození)/046g (úmrtí)
     #Splitnout výraz YYYYMMDD na YYYY-MM-DD. Příklad záznam xx0194367.
     #19420427 na YYYY-MM-DD
@@ -194,6 +308,18 @@ def prepare_date_from_date_field(date: Any, column) -> Union[None, dict]:
     return None
 
 def prepare_date_from_description(description: str, column) -> Union[list[dict], None]:
+    """
+    Extracts and processes date information from a given textual description. Identifies dates or years related to
+    birth ("narozen/a") or death ("zemřel/a") patterns in the description and converts them into a structured list
+    of dictionaries. The extracted date information is formatted according to the Wikibase Time format and includes
+    corresponding properties for birth (`P569`) or death (`P570`). If no dates are found, the function returns None.
+
+    :param description: The text containing potential date-related data.
+    :type description: str
+    :param column: Unused parameter included in the function signature for compatibility purposes.
+    :return: A list of dictionaries containing processed dates and associated metadata, or None if no dates are identified.
+    :rtype: Union[list[dict], None]
+    """
     if type(description) != str:
         return None
 
@@ -252,6 +378,20 @@ def prepare_date_from_description(description: str, column) -> Union[list[dict],
     return dates if dates else None
 
 def prepare_column_of_content(column: str, row) -> Union[str, Union[str, list]]:
+    """
+    Prepare content for a specified column based on its corresponding preparation method.
+
+    This function maps a given column identifier to its respective preparation function
+    and processes the data stored in the row for that column. The preparation logic
+    depends on the function associated with the column.
+
+    :param column: The column identifier that specifies the type of data in the row.
+    :param row: The data row containing information for the specified column, typically
+        in the form of a dictionary where column identifiers are keys.
+    :return: The processed data for the specified column returned by its associated
+        preparation function. The returned type may vary depending on the preparation
+        function, which can return a `str`, a `list`, or other nested formats.
+    """
     column_to_method_dictionary = {
         '0247a-isni': prepare_isni_from_nkcr,
         '0247a-orcid': prepare_orcid_from_nkcr,
@@ -269,6 +409,21 @@ def prepare_column_of_content(column: str, row) -> Union[str, Union[str, list]]:
 
 
 def resolve_exist_claims(column: str, wd_data: dict) -> Union[str, list]:
+    """
+    Resolves and retrieves claims associated with a specific column based on a given mapping in
+    the provided wikidata dictionary.
+
+    :param column: The key representing the specific claim to be resolved. Examples include
+                   '0247a-isni', '0247a-orcid', '374a', etc.
+    :type column: str
+    :param wd_data: A dictionary containing various potential claims mapped to their respective keys.
+                    Each key in the dictionary corresponds to a specific type of claim, such as
+                    'isni', 'orcid', 'occup', and so on.
+    :type wd_data: dict
+    :return: A list of claims associated with the provided column key in the input dictionary. If no
+             match exists for the given column, an empty list is returned.
+    :rtype: Union[str, list]
+    """
     claims = []
     if column == '0247a-isni':
         claims = wd_data['isni']

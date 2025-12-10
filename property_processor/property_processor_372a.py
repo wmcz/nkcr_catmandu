@@ -6,11 +6,39 @@ from tools import get_claim_from_item_by_property_wbi, add_new_field_to_item_wbi
 
 
 class PropertyProcessor372a(BasePropertyProcessor):
+    """
+    Processes properties and claims based on specified datasets.
 
+    This class is responsible for managing and processing properties using data retrieved
+    from external sources. It ensures that claims and fields are managed appropriately
+    based on specified conditions and configuration.
+
+    :ivar datas_from_wd: A dataset containing information retrieved from Wikidata,
+        used as the data source during processing.
+    :type datas_from_wd: ItemEntity
+    """
     def set_datas_from_wd(self, datas_from_wd: ItemEntity):
+        """
+        Sets the data received from the WD source.
+
+        :param datas_from_wd: The data entity to be set.
+        :type datas_from_wd: ItemEntity
+        :return: None
+        """
         self.datas_from_wd = datas_from_wd
 
     def process(self):
+        """
+        Processes the new fields for a given item by comparing them with claims from Wikidata.
+
+        This method ensures that specific occupations or properties are appropriately added
+        to an item if they are not already present and meet predefined conditions. The comparison
+        is performed against claims retrieved directly from Wikidata and a predefined set of
+        fields marked as invalid.
+
+        :raises AttributeError: If class attributes required for processing are not initialized.
+        :raises TypeError: If required data structures for comparison are not in the expected format.
+        """
         qid_claims_direct_from_wd = self.get_qid_claims_direct_from_wd_wbi()
         for item_in_list in self.row_new_fields[self.column]:
             item_occupation = item_in_list

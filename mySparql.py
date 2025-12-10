@@ -15,7 +15,17 @@ except ImportError:  # requests < 2.27.0
 
 
 class MySparqlQuery(SparqlQuery):
+    """
+    Provides functionality to execute SPARQL queries and retrieve parsed JSON results.
 
+    This class enables querying SPARQL endpoints and handles response fetching,
+    including retrying on timeouts and parsing the responses to JSON.
+
+    :ivar endpoint: The SPARQL endpoint URL used for executing queries.
+    :type endpoint: str
+    :ivar last_response: Stores the last HTTP response received after executing a query.
+    :type last_response: http.Response
+    """
     def query(self, query: str, headers: Optional[Dict[str, str]] = None):
         """
         Run SPARQL query and return parsed JSON result.

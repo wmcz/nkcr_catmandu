@@ -1,4 +1,29 @@
 class Config:
+    """
+    Represents the configuration settings for the application.
+
+    This class serves as a centralized location for storing various configuration
+    and data parameters. It includes options for debugging, database preferences,
+    counters for specific steps, blacklists, and mappings of specific properties.
+
+    :ivar user_name: The default username for the application.
+    :ivar debug: A flag indicating whether the application is in debug mode.
+    :ivar use_json_database: A flag indicating whether a JSON database is used.
+    :ivar count_first_step: Counter for the first step in a specific process.
+    :ivar count_second_step: Counter for the second step in a specific process.
+    :ivar occupations_not_used_in_occupation_because_is_in_function: A list of
+        occupation-related QIDs that are excluded because they are handled in
+        another function.
+    :ivar fields_of_work_not_used_in_field_of_work_because_is_not_ok: A list of
+        field-of-work QIDs that are excluded as they are not acceptable.
+    :ivar instances_not_possible_for_nkcr: A list of instance-related QIDs that
+        are not considered possible for NKCR.
+    :ivar qid_blacklist: A list of QIDs blacklisted for specific operations.
+    :ivar property_occupation: The property key used for defining an occupation (P106).
+    :ivar properties: A mapping of application-specific keys to their property IDs
+        in the database. Keys denote application-specific identifiers, while the
+        values point to database property keys.
+    """
     user_name: str = 'Frettiebot'
     debug: bool = False
     use_json_database: bool = False

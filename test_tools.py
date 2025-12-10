@@ -17,7 +17,7 @@ def test_is_item_subclass_of(item_qid, subclass_qid, return_value):
     repo = MyDataSite('wikidata', 'wikidata', user=Config.user_name)
     item = pywikibot.ItemPage(repo, item_qid)
     subclass = pywikibot.ItemPage(repo, subclass_qid)
-    assert tools.is_item_subclass_of(item, subclass) == return_value
+    assert tools.is_item_subclass_of_wbi(item, subclass) == return_value
 
 
 @pytest.mark.parametrize(
