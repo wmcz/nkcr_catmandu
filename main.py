@@ -284,6 +284,7 @@ if __name__ == '__main__':
 
 
 # print(cleaners.cachedData)
+print(cleaners.not_found_occupations)
 
 
 

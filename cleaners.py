@@ -11,6 +11,8 @@ from nkcr_exceptions import BadItemException
 name_to_nkcr: dict = {}
 language_dict: dict = {}
 
+not_found_occupations = {}
+
 cachedData = {}
 
 log = logging.getLogger(__name__)
@@ -95,6 +97,7 @@ def prepare_occupation_from_nkcr(occupation_string: str, column) -> Union[str, l
         string. Returns an empty list if the input string is empty or if no valid occupations are found.
     """
     nkcr_to_qid = name_to_nkcr
+    not_found = not_found_occupations
     occupations = []
     # log_with_date_time(occupation_string)
     if type(occupation_string) == str:
@@ -106,11 +109,15 @@ def prepare_occupation_from_nkcr(occupation_string: str, column) -> Union[str, l
             # occupations = [nkcr_to_qid[occupation] for occupation in splitted_occupations]
             occupations = []
             for occupation in splitted_occupations:
+                occupation = clean_last_comma(occupation)
                 if occupation in nkcr_to_qid:
                     occupations.append(nkcr_to_qid[occupation])
                 else:
+                    not_found_occupations[occupation] = not_found_occupations.get(occupation, 0) + 1
                     log.warning('not found occupation: ' + occupation)
         except KeyError as e:
+            occupation_key = e.args[0]
+            not_found_occupations[occupation_key] = not_found_occupations.get(occupation_key, 0) + 1
             log.warning('not found occupation: ' + str(e))
         # for occupation in splitted_occupations:
         #     try:
