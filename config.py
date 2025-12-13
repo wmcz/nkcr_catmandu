@@ -87,6 +87,7 @@ class Config:
         'Q59584399',
         'Q29020960',
         'Q744961',
+        'Q12023613'
     ]
 
     property_occupation = 'P106'
