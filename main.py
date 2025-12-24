@@ -217,6 +217,7 @@ if __name__ == '__main__':
                     if processor.item is not None and Config.debug is not True:
                         change_text_array = []
                         changed = False
+                        label_edit = False
 
                         if (processor.get_item().labels.get('cs') is None) and len(row['100a']) > 0:
                             whole_name = tools.first_name(row['100a']) + ' ' + tools.last_name(row['100a'])
@@ -224,13 +225,14 @@ if __name__ == '__main__':
                             log_with_date_time('New CS label for ' + nkcr_aut + ' is ' + whole_name)
                             changed = True
                             change_text_array.append('cs label')
+                            label_edit = True
 
                         nkcrs_wd = processor.get_item().claims.get('P691')
                         for nkcr in nkcrs_wd:
                             if nkcr.rank == WikibaseRank.DEPRECATED and nkcr.mainsnak.datavalue.get('value') == nkcr_aut:
                                 changed = False
 
-                        if changed is not True:
+                        if changed is not True or label_edit is True:
                             for prop in Config.properties.values():
                                 try:
                                     if (type(prop) is list):
@@ -285,6 +287,7 @@ if __name__ == '__main__':
 
 # print(cleaners.cachedData)
 print(cleaners.not_found_occupations)
+print(cleaners.not_found_places)
 
 
 

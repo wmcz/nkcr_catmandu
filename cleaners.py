@@ -12,6 +12,7 @@ name_to_nkcr: dict = {}
 language_dict: dict = {}
 
 not_found_occupations = {}
+not_found_places = {}
 
 cachedData = {}
 
@@ -185,6 +186,7 @@ def prepare_places_from_nkcr(place_string: str, column) -> Union[str, list]:
     :rtype: list
     """
     nkcr_to_qid = name_to_nkcr
+    not_found = not_found_places
     places: list = []
     # log_with_date_time(occupation_string)
     if type(place_string) == str:
@@ -215,8 +217,10 @@ def prepare_places_from_nkcr(place_string: str, column) -> Union[str, list]:
                 if corrected_place in nkcr_to_qid:
                     places.append(nkcr_to_qid[corrected_place])
                 else:
+                    not_found_places[corrected_place] = not_found_places.get(corrected_place, 0) + 1
                     log.warning('not found place: ' + corrected_place)
         except KeyError as e:
+            not_found_places[corrected_place] = not_found_places.get(corrected_place, 0) + 1
             log.warning('not found place: ' + str(e))
         # for occupation in splitted_occupations:
         #     try:
