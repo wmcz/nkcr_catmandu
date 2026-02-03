@@ -4,7 +4,7 @@ import logging
 import os
 import re
 from datetime import datetime
-from typing import Union, Any
+from typing import Union, Any, TYPE_CHECKING
 
 import pandas
 import pandas as pd
@@ -19,11 +19,13 @@ from wikibaseintegrator.entities import ItemEntity
 from wikibaseintegrator.models import References, Snaks, Claim, Snak, Reference
 from wikibaseintegrator.wbi_enums import WikibaseTimePrecision, WikibaseDatatype, ActionIfExists
 
-import cleaners
 import mySparql
 import pywikibot_extension
 from cleaners import clean_last_comma
 from config import Config
+
+if TYPE_CHECKING:
+    from context import PipelineContext
 log = logging.getLogger(__name__)
 
 
@@ -488,39 +490,39 @@ def get_claim_from_item_by_property_wbi(datas: ItemEntity, property_of_item: Any
 
         return claims_from_data
 
-def is_item_subclass_of_wbi(item_qid: str, subclass_qid: str):
+def is_item_subclass_of_wbi(item_qid: str, subclass_qid: str, context: 'PipelineContext'):
     """
     Determines whether a given Wikidata item is a subclass of another specified item.
     The function checks if the given `item_qid` is either a direct or indirect subclass
     of the given `subclass_qid`. The relationship can be through multiple levels within
     the Wikidata property hierarchy. A cache mechanism is utilized to enhance performance
-    by storing previous results.
+    by storing previous results in the context.
 
     :param item_qid: The QID of the item being checked (e.g., "Q42" for Douglas Adams).
     :type item_qid: str
     :param subclass_qid: The QID of the potential superclass item (e.g., "Q36180" for human).
     :type subclass_qid: str
+    :param context: Pipeline context containing the subclass cache.
     :return: `True` if `item_qid` is a subclass of `subclass_qid`, otherwise `False`.
     :rtype: bool
     """
-    try:
-        cached = cleaners.cachedData[subclass_qid][item_qid]
+    cached = context.get_cached_subclass_result(subclass_qid, item_qid)
+    if cached is not None:
         return cached
-    except KeyError as e:
-        pass
+
     query_first = """
         select distinct ?item where  {
             values ?item {wd:""" + item_qid + """}
-            
-            {?item wdt:P279 wd:""" + subclass_qid + """ .} union 
-            {?item wdt:P279/wdt:P279 wd:""" + subclass_qid + """ .} union 
+
+            {?item wdt:P279 wd:""" + subclass_qid + """ .} union
+            {?item wdt:P279/wdt:P279 wd:""" + subclass_qid + """ .} union
             {?item wdt:P279/wdt:P279/wdt:P279 wd:""" + subclass_qid + """ .} union
             {?item wdt:P279/wdt:P279/wdt:P279/wdt:P279 wd:""" + subclass_qid + """ .} union
             {?item wdt:P279/wdt:P279/wdt:P279/wdt:P279/wdt:P279 wd:""" + subclass_qid + """ .} union
             {?item wdt:P279/wdt:P279/wdt:P279/wdt:P279/wdt:P279/wdt:P279 wd:""" + subclass_qid + """ .} union
-  
-            {?item wdt:P31/wdt:P279 wd:""" + subclass_qid + """ .} union 
-            {?item wdt:P31/wdt:P279/wdt:P279 wd:""" + subclass_qid + """ .} union 
+
+            {?item wdt:P31/wdt:P279 wd:""" + subclass_qid + """ .} union
+            {?item wdt:P31/wdt:P279/wdt:P279 wd:""" + subclass_qid + """ .} union
             {?item wdt:P31/wdt:P279/wdt:P279/wdt:P279 wd:""" + subclass_qid + """ .} union
             {?item wdt:P31/wdt:P279/wdt:P279/wdt:P279/wdt:P279 wd:""" + subclass_qid + """ .} union
             {?item wdt:P31/wdt:P279/wdt:P279/wdt:P279/wdt:P279/wdt:P279 wd:""" + subclass_qid + """ .} union
@@ -530,21 +532,9 @@ def is_item_subclass_of_wbi(item_qid: str, subclass_qid: str):
 
     data_first = wbi_helpers.execute_sparql_query(query=query_first)
 
-    if len(data_first['results']['bindings']) == 0:
-        # not subclass of
-        if cleaners.cachedData.get(subclass_qid, False):
-            cleaners.cachedData[subclass_qid][item_qid] = False
-        else:
-            cleaners.cachedData[subclass_qid] = {}
-            cleaners.cachedData[subclass_qid][item_qid] = False
-        return False
-    else:
-        if cleaners.cachedData.get(subclass_qid, False):
-            cleaners.cachedData[subclass_qid][item_qid] = True
-        else:
-            cleaners.cachedData[subclass_qid] = {}
-
-        return True
+    is_subclass = len(data_first['results']['bindings']) > 0
+    context.cache_subclass_result(subclass_qid, item_qid, is_subclass)
+    return is_subclass
 
 
 def log_with_date_time(message: str = ''):

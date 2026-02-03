@@ -1,6 +1,6 @@
 import logging
 import re
-from typing import Union, Any
+from typing import Union, Any, TYPE_CHECKING
 from datetime import datetime
 from wikibaseintegrator.datatypes import Item, ExternalID, Time, String
 from wikibaseintegrator.wbi_enums import WikibaseTimePrecision
@@ -8,13 +8,8 @@ from wikibaseintegrator.wbi_enums import WikibaseTimePrecision
 import config
 from nkcr_exceptions import BadItemException
 
-name_to_nkcr: dict = {}
-language_dict: dict = {}
-
-not_found_occupations = {}
-not_found_places = {}
-
-cachedData = {}
+if TYPE_CHECKING:
+    from context import PipelineContext
 
 log = logging.getLogger(__name__)
 
@@ -86,21 +81,20 @@ def prepare_orcid_from_nkcr(orcid: str, column) -> str:
         return orcid
 
 
-def prepare_occupation_from_nkcr(occupation_string: str, column) -> Union[str, list]:
+def prepare_occupation_from_nkcr(occupation_string: str, column, context: 'PipelineContext') -> Union[str, list]:
     """
     Transforms an occupation string by mapping it to its corresponding identifier(s) based on the
-    `nkcr_to_qid` dictionary. This function processes a pipe-separated string of occupations and
+    context's name_to_nkcr dictionary. This function processes a pipe-separated string of occupations and
     returns a list of identifiers for valid occupations.
 
     :param occupation_string: A pipe-separated string of occupations to be transformed.
     :param column: An unused parameter included in the function signature.
+    :param context: Pipeline context containing lookup dictionaries and tracking state.
     :return: A list of identifiers (QIDs) corresponding to the valid occupations found in the input
         string. Returns an empty list if the input string is empty or if no valid occupations are found.
     """
-    nkcr_to_qid = name_to_nkcr
-    not_found = not_found_occupations
+    nkcr_to_qid = context.name_to_nkcr
     occupations = []
-    # log_with_date_time(occupation_string)
     if isinstance(occupation_string, str):
         if occupation_string.strip() == '':
             return occupations
@@ -113,18 +107,18 @@ def prepare_occupation_from_nkcr(occupation_string: str, column) -> Union[str, l
                 if occupation in nkcr_to_qid:
                     occupations.append(nkcr_to_qid[occupation])
                 else:
-                    not_found_occupations[occupation] = not_found_occupations.get(occupation, 0) + 1
+                    context.log_not_found_occupation(occupation)
                     log.warning('not found occupation: ' + occupation)
         except KeyError as e:
             occupation_key = e.args[0]
-            not_found_occupations[occupation_key] = not_found_occupations.get(occupation_key, 0) + 1
+            context.log_not_found_occupation(occupation_key)
             log.warning('not found occupation: ' + str(e))
     return occupations
 
-def prepare_language_from_nkcr(language_string: str, column) -> Union[str, list]:
+def prepare_language_from_nkcr(language_string: str, column, context: 'PipelineContext') -> Union[str, list]:
     """
     Prepares a list of languages mapped to a specific identifier based on the input string
-    and the `nkcr_to_qid` mapping dictionary. The input string is split by a delimiter,
+    and the context's language_dict mapping dictionary. The input string is split by a delimiter,
     and each resulting language is checked against the dictionary. If a match exists,
     it is appended to the result list. If no match exists, a warning is logged.
 
@@ -132,12 +126,12 @@ def prepare_language_from_nkcr(language_string: str, column) -> Union[str, list]
         by a `$` delimiter.
     :param column: Unused parameter, included for potential future use or interface
         consistency.
+    :param context: Pipeline context containing lookup dictionaries.
     :return: A list of identifiers corresponding to the languages found in the input
         string, or an empty list if no valid languages are found.
     """
-    nkcr_to_qid = language_dict
+    nkcr_to_qid = context.language_dict
     languages = []
-    # log_with_date_time(occupation_string)
     if isinstance(language_string, str):
         if language_string.strip() == '':
             return languages
@@ -154,25 +148,24 @@ def prepare_language_from_nkcr(language_string: str, column) -> Union[str, list]
             log.warning('not found language: ' + str(e))
     return languages
 
-def prepare_places_from_nkcr(place_string: str, column) -> Union[str, list]:
+def prepare_places_from_nkcr(place_string: str, column, context: 'PipelineContext') -> Union[str, list]:
     """
     Prepares a list of normalized place identifiers (QIDs) based on a provided place string. The function
     processes the input to handle specific delimiters and applies corrections to ensure proper formatting.
-    It then attempts to map the processed place names to corresponding QIDs using a predefined name-to-ID
+    It then attempts to map the processed place names to corresponding QIDs using the context's name_to_nkcr
     mapping.
 
     :param place_string: A string containing place names, potentially separated by delimiters.
                          Place names might need normalization for proper identification.
     :type place_string: str
     :param column: Additional context parameter (not currently used in function logic).
+    :param context: Pipeline context containing lookup dictionaries and tracking state.
     :return: A list containing the QIDs of the places found in the input string, or an empty list
              if none are found or the input is invalid.
     :rtype: list
     """
-    nkcr_to_qid = name_to_nkcr
-    not_found = not_found_places
+    nkcr_to_qid = context.name_to_nkcr
     places: list = []
-    # log_with_date_time(occupation_string)
     if isinstance(place_string, str):
         if place_string.strip() == '':
             return places
@@ -200,10 +193,10 @@ def prepare_places_from_nkcr(place_string: str, column) -> Union[str, list]:
                 if corrected_place in nkcr_to_qid:
                     places.append(nkcr_to_qid[corrected_place])
                 else:
-                    not_found_places[corrected_place] = not_found_places.get(corrected_place, 0) + 1
+                    context.log_not_found_place(corrected_place)
                     log.warning('not found place: ' + corrected_place)
         except KeyError as e:
-            not_found_places[corrected_place] = not_found_places.get(corrected_place, 0) + 1
+            context.log_not_found_place(corrected_place)
             log.warning('not found place: ' + str(e))
     return places
 
@@ -364,7 +357,7 @@ def prepare_date_from_description(description: str, column) -> Union[list[dict],
 
     return dates if dates else None
 
-def prepare_column_of_content(column: str, row) -> Union[str, Union[str, list]]:
+def prepare_column_of_content(column: str, row, context: 'PipelineContext') -> Union[str, Union[str, list]]:
     """
     Prepare content for a specified column based on its corresponding preparation method.
 
@@ -375,24 +368,35 @@ def prepare_column_of_content(column: str, row) -> Union[str, Union[str, list]]:
     :param column: The column identifier that specifies the type of data in the row.
     :param row: The data row containing information for the specified column, typically
         in the form of a dictionary where column identifiers are keys.
+    :param context: Pipeline context containing lookup dictionaries and tracking state.
     :return: The processed data for the specified column returned by its associated
         preparation function. The returned type may vary depending on the preparation
         function, which can return a `str`, a `list`, or other nested formats.
     """
-    column_to_method_dictionary = {
+    # Functions that don't need context
+    simple_methods = {
         '0247a-isni': prepare_isni_from_nkcr,
         '0247a-orcid': prepare_orcid_from_nkcr,
+        '046f': prepare_date_from_date_field,
+        '046g': prepare_date_from_date_field,
+        '678a': prepare_date_from_description,
+    }
+    # Functions that need context
+    context_methods = {
         '374a': prepare_occupation_from_nkcr,
         '372a': prepare_occupation_from_nkcr,
         '370a': prepare_places_from_nkcr,
         '370b': prepare_places_from_nkcr,
         '370f': prepare_places_from_nkcr,
         '377a': prepare_language_from_nkcr,
-        '046f': prepare_date_from_date_field,
-        '046g': prepare_date_from_date_field,
-        '678a': prepare_date_from_description,
     }
-    return column_to_method_dictionary[column](row[column], column)
+
+    if column in simple_methods:
+        return simple_methods[column](row[column], column)
+    elif column in context_methods:
+        return context_methods[column](row[column], column, context)
+    else:
+        raise KeyError(f"Unknown column: {column}")
 
 
 def resolve_exist_claims(column: str, wd_data: dict) -> Union[str, list]:

@@ -1,11 +1,14 @@
 import logging
 from datetime import datetime
-from typing import Union
+from typing import Union, TYPE_CHECKING
 
 from wikibaseintegrator.entities import ItemEntity
 
 from cleaners import clean_qid, resolve_exist_claims, prepare_column_of_content
 from config import *
+
+if TYPE_CHECKING:
+    from context import PipelineContext
 from property_processor.property_processor_370a import PropertyProcessor370a
 from property_processor.property_processor_370b import PropertyProcessor370b
 from property_processor.property_processor_370f import PropertyProcessor370f
@@ -71,6 +74,7 @@ class Processor:
         self.wbi = None
         self.instances_from_item = None
         self.save = True
+        self.context: 'PipelineContext' = None
 
     def get_instances_from_item(self):
         """
@@ -139,7 +143,7 @@ class Processor:
                 # claims_in_new_item = datas_new_field['claims'].get(property_for_new_field, [])
                 claims = resolve_exist_claims(column, wd_data)
 
-                row_new_fields[column] = prepare_column_of_content(column, row_new_fields)
+                row_new_fields[column] = prepare_column_of_content(column, row_new_fields, self.context)
                 array_diff = []
                 time_fields = False
                 save_time = True
@@ -208,7 +212,8 @@ class Processor:
                             property_processor = PropertyProcessor374a(
                                 wbi=self.wbi, property_for_new_field=property_for_new_field,
                                 column=column, row_new_fields=row_new_fields,
-                                claim_direct_from_wd=claim_direct_from_wd, item_new_field=item_new_field)
+                                claim_direct_from_wd=claim_direct_from_wd, item_new_field=item_new_field,
+                                context=self.context)
                             property_processor.process()
                         elif column == '372a':
                             property_processor = PropertyProcessor372a(
@@ -352,6 +357,15 @@ class Processor:
         :type wbi: Any
         """
         self.wbi = wbi
+
+    def set_context(self, context: 'PipelineContext'):
+        """
+        Sets the pipeline context for this processor.
+
+        :param context: The PipelineContext containing shared state and lookup data.
+        :type context: PipelineContext
+        """
+        self.context = context
 
     def process_occupation_type(self, non_deprecated_items):
         """

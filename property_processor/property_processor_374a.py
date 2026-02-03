@@ -33,7 +33,7 @@ class PropertyProcessor374a(BasePropertyProcessor):
             item_occupation = item_in_list
 
             if item_occupation not in qid_claims_direct_from_wd and item_occupation not in Config.occupations_not_used_in_occupation_because_is_in_function:
-                if is_item_subclass_of_wbi(item_occupation, class_occupation):
+                if is_item_subclass_of_wbi(item_occupation, class_occupation, self.context):
                     if self.row_new_fields[self.column] not in self.claim_direct_from_wd:
                         self.item_new_field = add_new_field_to_item_wbi(
                             self.item_new_field,

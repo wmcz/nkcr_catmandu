@@ -8,7 +8,6 @@ from wikibaseintegrator.wbi_enums import WikibaseRank
 from wikibaseintegrator.wbi_exceptions import MissingEntityException, MWApiError, ModificationFailed, SaveFailed, \
     NonExistentEntityError, MaxRetriesReachedException
 
-import cleaners
 import config
 import tools
 from cleaners import clean_qid
@@ -62,7 +61,8 @@ if __name__ == '__main__':
 
     loader = Loader()
     loader.set_file_name(file_name)
-    loader.load()
+    context = loader.load()
+    processor.set_context(context)
 
     head = {'item': 'item', 'prop': 'property', 'value': 'value'}
     write_log(head, True)
@@ -70,7 +70,7 @@ if __name__ == '__main__':
     count = 0
     inserts = 0
 
-    for chunk in loader.chunks:
+    for chunk in context.chunks:
         chunk.fillna('', inplace=True)
         chunk = chunk[chunk['100a'] != '']
         for row in chunk.to_dict('records'):
@@ -95,7 +95,7 @@ if __name__ == '__main__':
                     qid = clean_qid(qid)
 
                     try:
-                        nkcr_auts = loader.qid_to_nkcr.get(qid, [])
+                        nkcr_auts = context.qid_to_nkcr.get(qid, [])
                         if nkcr_aut not in nkcr_auts:
                             item = wbi.item.get(qid)
                             time_load_item = time.time()
@@ -127,23 +127,23 @@ if __name__ == '__main__':
                                         # add_nkcr_aut_to_item(Config.debug, repo, item, nkcr_aut, name)
                                         item = add_nkcr_aut_to_item_wbi(item, nkcr_aut, name)
 
-                                    loader.non_deprecated_items[nkcr_aut] = {
+                                    context.non_deprecated_items[nkcr_aut] = {
                                         'qid': qid,
                                         'isni': [],
                                         'orcid': []
                                     }
-                                    loader.non_deprecated_items_field_of_work_and_occupation[nkcr_aut] = {
+                                    context.non_deprecated_items_field_of_work_and_occupation[nkcr_aut] = {
                                         'qid': qid,
                                         'field': [],
                                         'occup': []
                                     }
-                                    loader.non_deprecated_items_places[nkcr_aut] = {
+                                    context.non_deprecated_items_places[nkcr_aut] = {
                                         'qid': qid,
                                         'birth': [],
                                         'death': [],
                                         'work': [],
                                     }
-                                    loader.non_deprecated_items_languages[nkcr_aut] = {
+                                    context.non_deprecated_items_languages[nkcr_aut] = {
                                         'qid': qid,
                                         'language': [],
                                     }
@@ -171,21 +171,21 @@ if __name__ == '__main__':
                         '0247a-orcid': 'P496',
                     }
                     processor.set_enabled_columns(properties)
-                    processor.process_occupation_type(loader.non_deprecated_items)
+                    processor.process_occupation_type(context.non_deprecated_items)
 
                     properties = {
                         '374a': 'P106',
                         '372a': 'P101',
                     }
                     processor.set_enabled_columns(properties)
-                    processor.process_occupation_type(loader.non_deprecated_items_field_of_work_and_occupation)
+                    processor.process_occupation_type(context.non_deprecated_items_field_of_work_and_occupation)
 
                     properties = {
                         '377a': 'P1412',
                     }
 
                     processor.set_enabled_columns(properties)
-                    processor.process_occupation_type(loader.non_deprecated_items_languages)
+                    processor.process_occupation_type(context.non_deprecated_items_languages)
 
                     properties = {
                         '370a': 'P19',
@@ -193,7 +193,7 @@ if __name__ == '__main__':
                         '370f': 'P937',
                     }
                     processor.set_enabled_columns(properties)
-                    processor.process_occupation_type(loader.non_deprecated_items_places)
+                    processor.process_occupation_type(context.non_deprecated_items_places)
 
                     properties = {
                         '046f': 'P569',
@@ -201,7 +201,7 @@ if __name__ == '__main__':
                         '678a': ['P569', 'P570'],
                     }
                     processor.set_enabled_columns(properties)
-                    processor.process_occupation_type(loader.non_deprecated_items)
+                    processor.process_occupation_type(context.non_deprecated_items)
                     time_process_after = time.time()
                     if (time_process_after - time_start > 1):
                         log_with_date_time('time_from_start_to_process_after:' + str(time_process_after - time_start))
@@ -277,11 +277,5 @@ if __name__ == '__main__':
             except MWApiError as e:
                 log.error(str(e))
 
-
-
-print(cleaners.not_found_occupations)
-print(cleaners.not_found_places)
-
-
-
-            # logger.logComplete(nkcr_aut)
+    print(context.not_found_occupations)
+    print(context.not_found_places)

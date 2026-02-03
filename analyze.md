@@ -63,19 +63,17 @@ These four files have **identical** `process()` methods — the same loop, same 
 
 ~800 lines of code that could be ~150 with a single parameterized function.
 
-### 6. Module-Level Mutable Global State
+### 6. ~~Module-Level Mutable Global State~~ FIXED
 **File:** `cleaners.py:11-17`
 **Severity:** HIGH
+**Status:** FIXED
 
-```python
-name_to_nkcr: dict = {}
-language_dict: dict = {}
-not_found_occupations = {}
-not_found_places = {}
-cachedData = {}
-```
+Replaced module-level global state with explicit dependency injection via `PipelineContext` class (`context.py`). All shared state is now passed explicitly through the pipeline:
+- `name_to_nkcr`, `language_dict` → loaded into `PipelineContext` by `Loader.load()`
+- `not_found_occupations`, `not_found_places` → tracking methods in `PipelineContext`
+- `cachedData` → `subclass_cache` in `PipelineContext` with helper methods
 
-These globals are mutated from multiple modules (`sources.py` sets `cleaners.name_to_nkcr` and `cleaners.language_dict`, `tools.py` mutates `cleaners.cachedData`). This makes the code hard to test, debug, and reason about.
+Functions in `cleaners.py` now accept `context` parameter, and `Processor` holds and passes context to property processors.
 
 ### 7. `resolve_exist_claims` Uses Chained `if` Instead of `elif`
 **File:** `cleaners.py:438-461`
@@ -183,6 +181,6 @@ The main processing loop is a 220-line deeply nested block (4-5 levels of indent
 2. **~~Fix the `type(x) is None` bug~~** ~~— this silently skips error handling for failed SPARQL queries~~ — FIXED
 3. **Consolidate the 4 identical property processors** into one class
 4. **Parameterize SPARQL query functions** to eliminate ~650 lines of duplication in `tools.py`
-5. **Replace module-level global state** in `cleaners.py` with a context object passed through the pipeline
+5. **~~Replace module-level global state~~** ~~in `cleaners.py` with a context object passed through the pipeline~~ — FIXED
 6. **~~Validate SPARQL inputs~~** ~~with strict regex to prevent injection~~ — FIXED
 7. **Add unit tests** for date parsing, occupation resolution, and the processor logic with mocked Wikidata responses

@@ -1,7 +1,10 @@
-from typing import Union
+from typing import Union, TYPE_CHECKING
 
 from wikibaseintegrator import WikibaseIntegrator
 from tools import *
+
+if TYPE_CHECKING:
+    from context import PipelineContext
 
 
 class BasePropertyProcessor:
@@ -25,7 +28,7 @@ class BasePropertyProcessor:
     :type wbi: WikibaseIntegrator
     :ivar claim_direct_from_wd: List of claims directly retrieved from Wikibase.
     """
-    def __init__(self, column, row_new_fields, claim_direct_from_wd, property_for_new_field, item_new_field, wbi):
+    def __init__(self, column, row_new_fields, claim_direct_from_wd, property_for_new_field, item_new_field, wbi, context: 'PipelineContext' = None):
         """
         Initializes the class with required attributes.
 
@@ -41,6 +44,8 @@ class BasePropertyProcessor:
         :type item_new_field: ItemEntity, optional
         :param wbi: An instance of the WikibaseIntegrator used for interacting with the Wikibase system.
         :type wbi: WikibaseIntegrator
+        :param context: Pipeline context containing shared state and lookup data.
+        :type context: PipelineContext, optional
         """
         self.property_for_new_field: Union[str, None] = property_for_new_field
         self.item_new_field: Union[ItemEntity, None] = item_new_field
@@ -48,6 +53,7 @@ class BasePropertyProcessor:
         self.row_new_fields: dict = row_new_fields
         self.wbi: WikibaseIntegrator = wbi
         self.claim_direct_from_wd = claim_direct_from_wd
+        self.context: 'PipelineContext' = context
 
     def set_claim_direct_from_wd(self, claim_direct_from_wd):
         """

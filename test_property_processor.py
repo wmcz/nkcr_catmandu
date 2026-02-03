@@ -3,6 +3,7 @@ from wikibaseintegrator import wbi_login, WikibaseIntegrator
 from wikibaseintegrator.wbi_config import config as wbi_config
 
 from cleaners import prepare_column_of_content
+from context import PipelineContext
 from property_processor.property_processor_374a import PropertyProcessor374a
 from property_processor.property_processor_one import PropertyProcessorOne
 from tools import *
@@ -11,6 +12,9 @@ wbi_config['USER_AGENT'] = 'Frettiebot/1.0 (https://www.wikidata.org/wiki/User:F
 bot_password = get_bot_password('bot_password')
 login_instance = wbi_login.Login(user='Frettiebot', password=bot_password)
 wbi = WikibaseIntegrator(login=login_instance, is_bot=True)
+
+# Create a minimal context for tests
+test_context = PipelineContext()
 @pytest.mark.parametrize(
     "qid,property_for_new_field,column,value,aut",
     [
@@ -27,7 +31,7 @@ def test_process_one(qid, property_for_new_field, column, value, aut):
         column: value,
         '_id': aut
     }
-    row_new_fields[column] = prepare_column_of_content(column, row_new_fields)
+    row_new_fields[column] = prepare_column_of_content(column, row_new_fields, test_context)
     property_processor = PropertyProcessorOne(wbi=wbi,
                                               property_for_new_field=property_for_new_field, column=column,
                                               row_new_fields=row_new_fields, claim_direct_from_wd=claim_direct_from_wd,
@@ -63,7 +67,7 @@ def test_process_occupation(qid, property_for_new_field, column, value, aut):
         '_id': aut
     }
 
-    property_processor = PropertyProcessor374a(wbi=wbi, property_for_new_field=property_for_new_field, column=column, row_new_fields=row_new_fields, claim_direct_from_wd=claim_direct_from_wd, item_new_field=item_new_field)
+    property_processor = PropertyProcessor374a(wbi=wbi, property_for_new_field=property_for_new_field, column=column, row_new_fields=row_new_fields, claim_direct_from_wd=claim_direct_from_wd, item_new_field=item_new_field, context=test_context)
     property_processor.process()
 
     claims_final = property_processor.item_new_field.claims.get(property_for_new_field)
