@@ -13,32 +13,23 @@
 
 ## CRITICAL — Security
 
-### 1. Hardcoded Bot Password in Test File
+### 1. ~~Hardcoded Bot Password in Test File~~ FIXED
 **File:** `test_property_processor.py:11`
 **Severity:** CRITICAL
-**Status:** FIXED
 
-```python
-login_instance = wbi_login.Login(user='Frettiebot', password='wikibaseintegrator@...')
-```
+Replaced with `get_bot_password('bot_password')` to read from the `bot_password` file. The credential should still be rotated since the old password remains in git history.
 
-The bot password was committed to the repository in plain text. This is a Wikidata bot credential with write access. Anyone with repo access can impersonate Frettiebot.
-
-**Fix applied:** Replaced with `get_bot_password('bot_password')` to read from the `bot_password` file, matching the pattern used in `main.py`. The credential should still be rotated since the old password remains in git history.
-
-### 2. SPARQL Injection via String Concatenation
+### 2. ~~SPARQL Injection via String Concatenation~~ FIXED
 **File:** `tools.py:272`, `tools.py:331`, `tools.py:441`, `tools.py:525`, `tools.py:619`, `tools.py:812-827`, `tools.py:1019`
 **Severity:** MEDIUM
-**Status:** FIXED (clean_qid regex anchored to `^Q[0-9]+$`)
 
-All SPARQL queries are built via string concatenation. The primary injection risk was through `item_qid`/`subclass_qid` in `is_item_subclass_of_wbi`, which passes through `clean_qid`. The regex was changed from `Q[0-9]+` (unanchored) to `^Q[0-9]+$` (full match), rejecting any QID with trailing characters.
+The `clean_qid` regex was anchored to `^Q[0-9]+$` (full match), rejecting any QID with trailing characters. `limit`/`offset` parameters are integers passed via `str()` — low risk.
 
-`limit`/`offset` parameters are integers passed via `str()` — low risk, no change needed.
-
-### 3. File Handles Not Properly Managed
+### 3. ~~File Handles Not Properly Managed~~ FIXED
 **File:** `tools.py:43-49`, `tools.py:62-63`, `tools.py:76-78`, `tools.py:903`
 **Severity:** LOW
-**Status:** FIXED (all converted to `with` statements)
+
+All file handles converted to `with` statements.
 
 ---
 
@@ -66,19 +57,14 @@ These four files have **identical** `process()` methods — the same loop, same 
 ### 6. ~~Module-Level Mutable Global State~~ FIXED
 **File:** `cleaners.py:11-17`
 **Severity:** HIGH
-**Status:** FIXED
 
-Replaced module-level global state with explicit dependency injection via `PipelineContext` class (`context.py`). All shared state is now passed explicitly through the pipeline:
-- `name_to_nkcr`, `language_dict` → loaded into `PipelineContext` by `Loader.load()`
-- `not_found_occupations`, `not_found_places` → tracking methods in `PipelineContext`
-- `cachedData` → `subclass_cache` in `PipelineContext` with helper methods
+Replaced with explicit dependency injection via `PipelineContext` class (`context.py`). All shared state is now passed explicitly through the pipeline.
 
-Functions in `cleaners.py` now accept `context` parameter, and `Processor` holds and passes context to property processors.
-
-### 7. `resolve_exist_claims` Uses Chained `if` Instead of `elif`
+### 7. ~~`resolve_exist_claims` Uses Chained `if` Instead of `elif`~~ FIXED
 **File:** `cleaners.py:438-461`
 **Severity:** MEDIUM
-**Status:** FIXED (replaced with dictionary lookup, consistent with `prepare_column_of_content` pattern)
+
+Replaced with dictionary lookup, consistent with `prepare_column_of_content` pattern.
 
 ### 8. ~~Dead/Commented-Out Code Throughout~~ FIXED
 **Files:** `main.py`, `tools.py`, `cleaners.py`, `processor.py`
