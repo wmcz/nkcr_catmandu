@@ -28,10 +28,6 @@ args = parser.parse_args()
 
 file_name = args.input
 
-# logging.basicConfig(level=logging.INFO,
-#                     format='%(levelname)s:%(module)s:%(asctime)s:%(message)s',
-#                     filename='catmandu.log',
-#                     filemode='a')
 logging.basicConfig(
         handlers=[RotatingFileHandler('catmandu.log',
                                mode='a',
@@ -158,10 +154,8 @@ if __name__ == '__main__':
                     except ValueError as e:
                         log.error(str(e))
                 ms = time.time()
-                # print(ms)
                 if save:
                     time_process = time.time()
-                    # log_with_date_time('time_from_start_to_process_start:' + str(time_process - time_start))
                     processor.set_nkcr_aut(nkcr_aut)
                     processor.set_qid(qid)
                     processor.set_wbi(wbi)
@@ -285,7 +279,6 @@ if __name__ == '__main__':
 
 
 
-# print(cleaners.cachedData)
 print(cleaners.not_found_occupations)
 print(cleaners.not_found_places)
 

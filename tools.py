@@ -2,6 +2,7 @@ import csv
 import gc
 import logging
 import os
+import re
 from datetime import datetime
 from typing import Union, Any
 
@@ -39,14 +40,11 @@ def write_log(fields, create_file=False):
     :type create_file: bool
     :return: None
     """
-    if create_file:
-        csvfile = open('debug.csv', 'w')
-    else:
-        csvfile = open('debug.csv', 'a')
-    writer = csv.DictWriter(csvfile, fieldnames=['item', 'prop', 'value'])
-    writer.writerow(fields)
+    mode = 'w' if create_file else 'a'
+    with open('debug.csv', mode) as csvfile:
+        writer = csv.DictWriter(csvfile, fieldnames=['item', 'prop', 'value'])
+        writer.writerow(fields)
     log.info(fields)
-    csvfile.close()
 
 
 def reset_debug_file():
@@ -59,8 +57,8 @@ def reset_debug_file():
 
     :return: None
     """
-    csvfile = open('debug.csv', 'w')
-    csvfile.close()
+    with open('debug.csv', 'w'):
+        pass
 
 
 def read_log() -> csv.DictReader:
@@ -73,9 +71,9 @@ def read_log() -> csv.DictReader:
              represented as a dictionary with keys corresponding to 'item', 'prop', and 'value'.
     :rtype: csv.DictReader
     """
-    csvfile = open('debug.csv', 'r')
-    reader = csv.DictReader(csvfile, fieldnames=['item', 'prop', 'value'])
-    return reader
+    with open('debug.csv', 'r') as csvfile:
+        reader = csv.DictReader(csvfile, fieldnames=['item', 'prop', 'value'])
+        return list(reader)
 
 
 def print_info(debug: bool):
@@ -189,7 +187,6 @@ def add_nkcr_aut_to_item_wbi(
 
     final = {'item': item_to_add.id, 'prop': 'P691', 'value': nkcr_aut_to_add}
     write_log(final)
-    # print(final)
     new_claim = ExternalID(value=nkcr_aut_to_add, prop_nr='P691', references=references, qualifiers=qualifier)
     item_to_add.claims.add(new_claim, action_if_exists=ActionIfExists.APPEND_OR_REPLACE)
     return item_to_add
@@ -279,11 +276,11 @@ def get_occupations(limit: Union[int, None] = None, offset: Union[int, None] = N
     except simplejson.errors.JSONDecodeError as e:
         log_with_date_time('get occupations JSONDecodeError: ' + str(e))
         return occupation_dictionary
-    except Exception as e:
-        log_with_date_time('get occupations Exception: ' + str(e))
-        return occupation_dictionary
     except requests.exceptions.ConnectionError as e:
         log_with_date_time('get occupations ConnectionError: ' + str(e))
+        return occupation_dictionary
+    except Exception as e:
+        log_with_date_time('get occupations Exception: ' + str(e))
         return occupation_dictionary
 
     for item_occupation in data_occupation_wbi['results']['bindings']:
@@ -298,28 +295,71 @@ def get_occupations(limit: Union[int, None] = None, offset: Union[int, None] = N
     return occupation_dictionary
 
 
-def get_all_non_deprecated_items(limit: Union[int, None] = None, offset: Union[int, None] = None) -> dict[
-    dict[str, list, list]]:
+def _fetch_non_deprecated_sparql(query: str, optional_fields: list[str],
+                                 entity_fields: list[str], log_label: str) -> dict:
     """
-    Retrieve non-deprecated items from a SPARQL endpoint, including optional metadata such as ISNI, ORCID, birth, and
-    death information.
+    Execute a SPARQL query via mySparql and build a dictionary keyed by 'nkcr'.
 
-    The function queries a SPARQL endpoint (assumed to be Wikidata's query service) to return a dictionary of non-deprecated
-    items, including metadata retrieved for each item. Metadata includes ISNI, ORCID, birth date, and death date,
-    all of which are optional. The query skips items marked with a deprecated rank.
+    Each result row must have 'item' and 'nkcr'. Optional fields are collected
+    into lists per nkcr entry. Fields listed in entity_fields have the Wikidata
+    entity URI prefix stripped.
 
-    :param limit: The maximum number of items to include in the query result. If set to None, no limit is applied.
-    :param offset: The offset for the query to support pagination. If set to None, querying starts from the first item.
-    :return: A dictionary where each key is an NKCR identifier and the corresponding value is a dictionary with various
-             metadata fields. Metadata includes:
-             - 'qid' (str): The Wikidata QID of the item.
-             - 'isni' (list): A list of ISNI identifiers associated with the item.
-             - 'orcid' (list): A list of ORCID identifiers associated with the item.
-             - 'birth' (list): A list of birth dates associated with the item.
-             - 'death' (list): A list of death dates associated with the item.
+    :param query: SPARQL query string (with LIMIT/OFFSET already included).
+    :param optional_fields: Field names to collect from results.
+    :param entity_fields: Subset of optional_fields that are entity URIs
+                          (need 'http://www.wikidata.org/entity/' stripped).
+    :param log_label: Label for error log messages.
+    :return: Dict keyed by nkcr, values are dicts with 'qid' + list fields.
     """
-    non_deprecated_dictionary: dict[dict[str, list, list]] = {}
+    result: dict = {}
+    entity_prefix = 'http://www.wikidata.org/entity/'
+    entity_fields_set = set(entity_fields)
 
+    query_object = mySparql.MySparqlQuery(endpoint="https://query-main.wikidata.org/sparql",
+                                          entity_url=entity_prefix)
+    try:
+        data = query_object.select(query=query, full_data=False)
+    except simplejson.errors.JSONDecodeError as e:
+        log_with_date_time(f'{log_label} JSONDecodeError: {e}')
+        return result
+    except rapidjson.JSONDecodeError as e:
+        log_with_date_time(f'{log_label} JSONDecodeError: {e}')
+        return result
+    except pywikibot.exceptions.ServerError as e:
+        log_with_date_time(f'{log_label} ServerError: {e}')
+        return result
+    except requests.exceptions.ConnectionError as e:
+        log_with_date_time(f'{log_label} ConnectionError: {e}')
+        return result
+
+    if data is None:
+        return result
+
+    for row in data:
+        nkcr = row['nkcr']
+
+        parsed = {}
+        for field in optional_fields:
+            val = row[field]
+            if val is not None and field in entity_fields_set:
+                val = val.replace(entity_prefix, '')
+            parsed[field] = val
+
+        if result.get(nkcr):
+            for field in optional_fields:
+                if parsed[field] is not None:
+                    result[nkcr][field].append(parsed[field])
+        else:
+            entry = {'qid': row['item'].replace(entity_prefix, '')}
+            for field in optional_fields:
+                entry[field] = [parsed[field]] if parsed[field] is not None else []
+            result[nkcr] = entry
+
+    del data
+    return result
+
+
+def get_all_non_deprecated_items(limit: Union[int, None] = None, offset: Union[int, None] = None) -> dict:
     query = """
     select ?item ?nkcr ?isni ?orcid ?birth ?death where {
         ?item p:P691 [ps:P691 ?nkcr ; wikibase:rank ?rank ] filter(?rank != wikibase:DeprecatedRank) .
@@ -327,373 +367,35 @@ def get_all_non_deprecated_items(limit: Union[int, None] = None, offset: Union[i
         OPTIONAL{?item wdt:P496 ?orcid}.
         OPTIONAL{?item wdt:P569 ?birth}.
         OPTIONAL{?item wdt:P570 ?death}.
-        # VALUES ?nkcr {'mub2013789925' 'xx0270669' 'xx0279468' 'uk20241216330'}
-    } LIMIT """ + str(limit) + """ OFFSET """ + str(offset) + """
-    """
-
-    query_object = mySparql.MySparqlQuery(endpoint="https://query-main.wikidata.org/sparql",
-                                          entity_url='http://www.wikidata.org/entity/')
-    try:
-        data_non_deprecated = query_object.select(query=query, full_data=False)
-    except simplejson.errors.JSONDecodeError as e:
-        log_with_date_time('get non deprecated items JSONDecodeError: ' + str(e))
-        return non_deprecated_dictionary
-    except rapidjson.JSONDecodeError as e:
-        log_with_date_time('get non deprecated items JSONDecodeError: ' + str(e))
-        return non_deprecated_dictionary
-    except pywikibot.exceptions.ServerError as e:
-        log_with_date_time('get non deprecated items ServerError: ' + str(e))
-        return non_deprecated_dictionary
-    except requests.exceptions.ConnectionError as e:
-        log_with_date_time('get non deprecated items ConnectionError: ' + str(e))
-        return non_deprecated_dictionary
-
-    # non_deprecated_dictionary_cache = []
-    item_non_deprecated: dict[str, Union[
-        pywikibot.data.sparql.URI, pywikibot.data.sparql.Literal, Union[pywikibot.data.sparql.Literal, None], Union[
-            pywikibot.data.sparql.Literal, None]]]
-    for item_non_deprecated in data_non_deprecated:
-        if item_non_deprecated['isni'] is not None:
-            isni = item_non_deprecated['isni']
-        else:
-            isni = None
-
-        if item_non_deprecated['orcid'] is not None:
-            orcid = item_non_deprecated['orcid']
-        else:
-            orcid = None
-
-        if item_non_deprecated['birth'] is not None:
-            birth = item_non_deprecated['birth']
-        else:
-            birth = None
-
-        if item_non_deprecated['death'] is not None:
-            death = item_non_deprecated['death']
-        else:
-            death = None
-
-        if non_deprecated_dictionary.get(item_non_deprecated['nkcr'], None):
-            if isni is not None:
-                non_deprecated_dictionary[item_non_deprecated['nkcr']]['isni'].append(isni)
-
-            if orcid is not None:
-                non_deprecated_dictionary[item_non_deprecated['nkcr']]['orcid'].append(orcid)
-
-            if birth is not None:
-                non_deprecated_dictionary[item_non_deprecated['nkcr']]['birth'].append(birth)
-
-            if death is not None:
-                non_deprecated_dictionary[item_non_deprecated['nkcr']]['death'].append(death)
-        else:
-            if isni is not None:
-                isni_add = [isni]
-            else:
-                isni_add = []
-
-            if orcid is not None:
-                orcid_add = [orcid]
-            else:
-                orcid_add = []
-
-            if birth is not None:
-                birth_add = [birth]
-            else:
-                birth_add = []
-
-            if death is not None:
-                death_add = [death]
-            else:
-                death_add = []
-
-            non_deprecated_dictionary[item_non_deprecated['nkcr']] = {
-                'qid': item_non_deprecated['item'].replace('http://www.wikidata.org/entity/', ''),
-                'isni': isni_add,
-                'orcid': orcid_add,
-                'birth': birth_add,
-                'death': death_add,
-            }
-    del data_non_deprecated
-    return non_deprecated_dictionary
+    } LIMIT """ + str(limit) + " OFFSET " + str(offset)
+    return _fetch_non_deprecated_sparql(
+        query, ['isni', 'orcid', 'birth', 'death'], [],
+        'get non deprecated items')
 
 
-def get_all_non_deprecated_items_occupation(limit: Union[int, None] = None, offset: Union[int, None] = None) -> dict[dict[str, list, list]]:
-    """
-    Retrieves a dictionary containing non-deprecated items and their associated occupations based on the given
-    `limit` and `offset` values. This function queries a SPARQL endpoint to fetch the data.
-
-    :param limit: The maximum number of items to retrieve. If None, no limit is applied.
-    :type limit: Union[int, None]
-    :param offset: The number of items to skip before starting to retrieve the data. If None, no offset is applied.
-    :type offset: Union[int, None]
-    :return: A dictionary where the keys are NKCR codes and the values are dictionaries containing `qid`
-        for the Wikidata ID and a list of occupations.
-    :rtype: dict[dict[str, list, list]]
-    """
-    non_deprecated_dictionary: dict[dict[str, list, list]] = {}
-
-    query = """
-    select ?item ?nkcr ?occup where {
-        ?item p:P691 [ps:P691 ?nkcr ; wikibase:rank ?rank ] filter(?rank != wikibase:DeprecatedRank) .
-        OPTIONAL{?item wdt:P106 ?occup}.
-        # VALUES ?nkcr {'test123' 'xx0313436' 'xx0313312' 'uk20241216330'}
-        
-    } LIMIT """ + str(limit) + """ OFFSET """ + str(offset) + """
-    """
-    # if (limit is not None):
-    #     query = query + ' LIMIT ' + str(limit)
-
-    # query_object = mySparql.MySparqlQuery()
-    # query_object = mySparql.MySparqlQuery()
-    query_object = mySparql.MySparqlQuery(endpoint="https://query-main.wikidata.org/sparql",
-                                          entity_url='http://www.wikidata.org/entity/')
-
-    try:
-        data_non_deprecated = query_object.select(query=query, full_data=False)
-    except simplejson.errors.JSONDecodeError as e:
-        log_with_date_time('get non deprecated items occupation JSONDecodeError: ' + str(e))
-        return non_deprecated_dictionary
-    except rapidjson.JSONDecodeError as e:
-        log_with_date_time('get non deprecated items occupation JSONDecodeError: ' + str(e))
-        return non_deprecated_dictionary
-    except pywikibot.exceptions.ServerError as e:
-        log_with_date_time('get non deprecated items occupation ServerError: ' + str(e))
-        return non_deprecated_dictionary
-    except requests.exceptions.ConnectionError as e:
-        log_with_date_time('get non deprecated items occupation ConnectionError: ' + str(e))
-        return non_deprecated_dictionary
-
-    if type(data_non_deprecated) is None:
-        return non_deprecated_dictionary
-
-    # non_deprecated_dictionary_cache = []
-    item_non_deprecated: dict[str, Union[
-        str, pywikibot.data.sparql.Literal, Union[pywikibot.data.sparql.Literal, None], Union[
-            pywikibot.data.sparql.Literal, None]]]
-    for item_non_deprecated in data_non_deprecated:
-        if item_non_deprecated['occup'] is not None:
-            occupation = item_non_deprecated['occup'].replace('http://www.wikidata.org/entity/', '')
-        else:
-            occupation = None
-
-        if non_deprecated_dictionary.get(item_non_deprecated['nkcr'], None):
-            if occupation is not None:
-                non_deprecated_dictionary[item_non_deprecated['nkcr']]['occup'].append(occupation)
-        else:
-            if occupation is not None:
-                occupation_add = [occupation]
-            else:
-                occupation_add = []
-
-            non_deprecated_dictionary[item_non_deprecated['nkcr']] = {
-                'qid': item_non_deprecated['item'].replace('http://www.wikidata.org/entity/', ''),
-                'occup': occupation_add,
-            }
-    del data_non_deprecated
-    del query_object
-    return non_deprecated_dictionary
-
-
-def get_all_non_deprecated_items_field_of_work_and_occupation(limit: Union[int, None] = None, offset: Union[int, None] = None) -> dict[dict[str, list, list]]:
-    """
-    Fetches non-deprecated records of items including their respective fields of work and occupations from a SPARQL endpoint.
-
-    This function queries the given SPARQL endpoint for non-deprecated items, retrieves their QIDs,
-    and optionally their fields of work (`P101`) and occupations (`P106`). The results are aggregated
-    into a nested dictionary, where each key is the `nkcr` value of an item, and each value is a dictionary
-    containing the `qid`, list of `field` identifiers, and list of `occup` identifiers.
-
-    :param limit: Specifies the maximum number of results to fetch. If None, no limit is applied.
-    :type limit: Union[int, None]
-    :param offset: Specifies the starting point for result fetching. Useful for pagination. If None, results
-                   start from the beginning of the dataset.
-    :type offset: Union[int, None]
-    :return: A dictionary where keys are `nkcr` identifiers (non-deprecated items) and values are dictionaries
-             containing the item's QID, a list of field of work identifiers (`field`), and a list of occupation
-             identifiers (`occup`).
-    :rtype: dict[dict[str, list, list]]
-    """
-    non_deprecated_dictionary: dict[dict[str, list, list]] = {}
-
+def get_all_non_deprecated_items_field_of_work_and_occupation(limit: Union[int, None] = None, offset: Union[int, None] = None) -> dict:
     query = """
     select ?item ?nkcr ?field ?occup where {
         ?item p:P691 [ps:P691 ?nkcr ; wikibase:rank ?rank ] filter(?rank != wikibase:DeprecatedRank) .
         OPTIONAL{?item wdt:P101 ?field}.
         OPTIONAL{?item wdt:P106 ?occup}.
-       # VALUES ?nkcr {'test123' 'xx0313436' 'xx0313312' 'uk20241216330'}
-
-    } LIMIT """ + str(limit) + """ OFFSET """ + str(offset) + """
-    """
-    # if (limit is not None):
-    #     query = query + ' LIMIT ' + str(limit)
-
-    # query_object = sparql.SparqlQuery()
-    query_object = mySparql.MySparqlQuery(endpoint="https://query-main.wikidata.org/sparql", entity_url='http://www.wikidata.org/entity/')
-    # query_object = mySparql.MySparqlQuery()
-    try:
-        data_non_deprecated = query_object.select(query=query, full_data=False)
-    except simplejson.errors.JSONDecodeError as e:
-        log_with_date_time('get non deprecated items field of work and occupation JSONDecodeError: ' + str(e))
-        return non_deprecated_dictionary
-    except rapidjson.JSONDecodeError as e:
-        log_with_date_time('get non deprecated items field of work and occupation JSONDecodeError: ' + str(e))
-        return non_deprecated_dictionary
-    except pywikibot.exceptions.ServerError as e:
-        log_with_date_time('get non deprecated items field of work and occupation ServerError: ' + str(e))
-        return non_deprecated_dictionary
-    except requests.exceptions.ConnectionError as e:
-        log_with_date_time('get non deprecated items field of work and occupation ConnectionError: ' + str(e))
-        return non_deprecated_dictionary
-
-    if type(data_non_deprecated) is None:
-        return non_deprecated_dictionary
-
-    # non_deprecated_dictionary_cache = []
-    item_non_deprecated: dict[str, Union[
-        pywikibot.data.sparql.URI, pywikibot.data.sparql.Literal, Union[pywikibot.data.sparql.Literal, None], Union[
-            pywikibot.data.sparql.Literal, None]]]
-    for item_non_deprecated in data_non_deprecated:
-        if item_non_deprecated['field'] is not None:
-            field_of_work = item_non_deprecated['field'].replace('http://www.wikidata.org/entity/', '')
-        else:
-            field_of_work = None
-
-        if item_non_deprecated['occup'] is not None:
-            occupation = item_non_deprecated['occup'].replace('http://www.wikidata.org/entity/', '')
-        else:
-            occupation = None
-
-        if non_deprecated_dictionary.get(item_non_deprecated['nkcr'], None):
-            if field_of_work is not None:
-                non_deprecated_dictionary[item_non_deprecated['nkcr']]['field'].append(field_of_work)
-
-            if occupation is not None:
-                non_deprecated_dictionary[item_non_deprecated['nkcr']]['occup'].append(occupation)
-        else:
-            if field_of_work is not None:
-                field_of_work_add = [field_of_work]
-            else:
-                field_of_work_add = []
-
-            if occupation is not None:
-                occupation_add = [occupation]
-            else:
-                occupation_add = []
-
-            non_deprecated_dictionary[item_non_deprecated['nkcr']] = {
-                'qid': item_non_deprecated['item'].replace('http://www.wikidata.org/entity/', ''),
-                'field': field_of_work_add,
-                'occup': occupation_add,
-            }
-    del data_non_deprecated
-    return non_deprecated_dictionary
+    } LIMIT """ + str(limit) + " OFFSET " + str(offset)
+    return _fetch_non_deprecated_sparql(
+        query, ['field', 'occup'], ['field', 'occup'],
+        'get non deprecated items field of work and occupation')
 
 
-def get_all_non_deprecated_items_places(limit: Union[int, None] = None, offset: Union[int, None] = None) -> dict[dict[str, list, list]]:
-    """
-    Fetches a dictionary of non-deprecated items and some of their associated properties from a SPARQL query.
-
-    The function queries a SPARQL endpoint, filtering out deprecated entities, and retrieves a set of data that includes
-    items, NKCR IDs, and optionally associated birthplaces, death places, and workplaces. Data is returned as a dictionary
-    organized by NKCR IDs.
-
-    :param limit: Maximum number of items to fetch from the query. If None, no limit is applied.
-    :type limit: Union[int, None]
-    :param offset: Number of initial items from the query to skip over. If None, no offset is applied.
-    :type offset: Union[int, None]
-
-    :return: A nested dictionary containing non-deprecated items. Each item is keyed by its NKCR ID and contains
-        sub-dictionaries with attributes such as 'qid', 'birth', 'death', and 'work'. Each attribute stores lists of
-        corresponding data.
-    :rtype: dict[dict[str, list, list]]
-    """
-    non_deprecated_dictionary: dict[dict[str, list, list]] = {}
-
+def get_all_non_deprecated_items_places(limit: Union[int, None] = None, offset: Union[int, None] = None) -> dict:
     query = """
-    select  ?item ?nkcr ?birth ?death ?work where {
+    select ?item ?nkcr ?birth ?death ?work where {
         ?item p:P691 [ps:P691 ?nkcr ; wikibase:rank ?rank ] filter(?rank != wikibase:DeprecatedRank) .
         OPTIONAL{?item wdt:P19 ?birth}.
         OPTIONAL{?item wdt:P20 ?death}.
         OPTIONAL{?item wdt:P937 ?work}.
-       # VALUES ?nkcr {'test123' 'xx0313436' 'xx0313312' 'uk20241216330'}
-    }  LIMIT """ + str(limit) + """ OFFSET """ + str(offset) + """
-    """
-    # if (limit is not None):
-    #     query = query + ' LIMIT ' + str(limit)
-
-    # query_object = sparql.SparqlQuery()
-    # query_object = mySparql.MySparqlQuery()
-    query_object = mySparql.MySparqlQuery(endpoint="https://query-main.wikidata.org/sparql",
-                                          entity_url='http://www.wikidata.org/entity/')
-    try:
-        data_non_deprecated = query_object.select(query=query, full_data=False)
-    except simplejson.errors.JSONDecodeError as e:
-        log_with_date_time('get non deprecated items places JSONDecodeError: ' + str(e))
-        return non_deprecated_dictionary
-    except rapidjson.JSONDecodeError as e:
-        log_with_date_time('get non deprecated items places JSONDecodeError: ' + str(e))
-        return non_deprecated_dictionary
-    except pywikibot.exceptions.ServerError as e:
-        log_with_date_time('get non deprecated items places ServerError: ' + str(e))
-        return non_deprecated_dictionary
-    except requests.exceptions.ConnectionError as e:
-        log_with_date_time('get non deprecated items places ConnectionError: ' + str(e))
-        return non_deprecated_dictionary
-
-    if type(data_non_deprecated) is None:
-        return non_deprecated_dictionary
-
-    # non_deprecated_dictionary_cache = []
-    item_non_deprecated: dict[str, Union[
-        str, str, Union[pywikibot.data.sparql.Literal, None], Union[
-            pywikibot.data.sparql.Literal, None]]]
-    for item_non_deprecated in data_non_deprecated:
-        if item_non_deprecated['birth'] is not None:
-            birth = item_non_deprecated['birth'].replace('http://www.wikidata.org/entity/', '')
-        else:
-            birth = None
-
-        if item_non_deprecated['death'] is not None:
-            death = item_non_deprecated['death'].replace('http://www.wikidata.org/entity/', '')
-        else:
-            death = None
-
-        if item_non_deprecated['work'] is not None:
-            work = item_non_deprecated['work'].replace('http://www.wikidata.org/entity/', '')
-        else:
-            work = None
-
-        if non_deprecated_dictionary.get(item_non_deprecated['nkcr'], None):
-            if birth is not None:
-                non_deprecated_dictionary[item_non_deprecated['nkcr']]['birth'].append(birth)
-            if death is not None:
-                non_deprecated_dictionary[item_non_deprecated['nkcr']]['death'].append(death)
-            if work is not None:
-                non_deprecated_dictionary[item_non_deprecated['nkcr']]['work'].append(work)
-        else:
-            if birth is not None:
-                birth_add = [birth]
-            else:
-                birth_add = []
-
-            if death is not None:
-                death_add = [death]
-            else:
-                death_add = []
-
-            if work is not None:
-                work_add = [work]
-            else:
-                work_add = []
-
-            non_deprecated_dictionary[item_non_deprecated['nkcr']] = {
-                'qid': item_non_deprecated['item'].replace('http://www.wikidata.org/entity/', ''),
-                'birth': birth_add,
-                'death': death_add,
-                'work': work_add,
-            }
-    del data_non_deprecated
-    return non_deprecated_dictionary
+    } LIMIT """ + str(limit) + " OFFSET " + str(offset)
+    return _fetch_non_deprecated_sparql(
+        query, ['birth', 'death', 'work'], ['birth', 'death', 'work'],
+        'get non deprecated items places')
 
 
 def load_nkcr_items(file_name) -> pandas.DataFrame:
@@ -734,7 +436,6 @@ def load_nkcr_items(file_name) -> pandas.DataFrame:
         '0247a': 'S',
         '0247a-orcid': 'S'
     }, chunksize=10000)
-    # data_csv.fillna('', inplace=True)
     return data_csv
 
 def get_claim_from_item_by_property_wbi(datas: ItemEntity, property_of_item: Any) -> list:
@@ -764,7 +465,6 @@ def get_claim_from_item_by_property_wbi(datas: ItemEntity, property_of_item: Any
                     claims_from_data.append(claim.mainsnak.datavalue['value'])
                 elif claim.mainsnak.datatype == WikibaseDatatype.TIME.value:
                     value: dict = claim.mainsnak.datavalue['value']
-                    # value.update({'property': prop})
                     claims_from_data.append(value)
                 else:
                     claims_from_data.append(claim.mainsnak.datavalue['value']['id'])
@@ -846,25 +546,6 @@ def is_item_subclass_of_wbi(item_qid: str, subclass_qid: str):
 
         return True
 
-    # if len(data_first['results']['bindings']) == 0:
-    #     # not subclass of - maybe
-    #     query = """
-    #         select ?item where  {
-    #             values ?item {wd:""" + item_qid + """}
-    #             ?item wdt:P279*/wdt:P31 wd:""" + subclass_qid + """ .
-    #         }
-    #         """
-    #
-    #     data_is_subclass = wbi_helpers.execute_sparql_query(query=query)
-    #     # data_is_subclass = query_object.select(query=query, full_data=False)
-    #     if len(data_is_subclass['results']['bindings']) == 0:
-    #         # not subclass of
-    #         return False
-    #     else:
-    #         return True
-    # else:
-    #     return True
-
 
 def log_with_date_time(message: str = ''):
     """
@@ -900,8 +581,8 @@ def load_sparql_query_by_chunks(limit: int, get_method, name: str):
     """
     if Config.use_json_database:
         if os.path.isfile(name + '.json'):
-            infile = open(name + '.json')
-            data = simplejson.load(infile)
+            with open(name + '.json') as infile:
+                data = simplejson.load(infile)
             return data
     if not os.path.isfile(name + '.json') or Config.debug == False:
         i = 0
@@ -988,76 +669,15 @@ def download_language_dict_csv() -> str:
     return filename
 
 
-def get_all_non_deprecated_items_languages(limit: Union[int, None] = None, offset: Union[int, None] = None) -> dict[
-    dict[str, list, list]]:
-    """
-    Fetches all non-deprecated items and their respective languages from a Wikidata endpoint.
-
-    This function constructs and executes a SPARQL query to retrieve non-deprecated items
-    along with their corresponding languages from the specified endpoint. The results are
-    processed and returned as a dictionary, where each key is an item's identifier (NKCR
-    identifier), and the values contain the item's QID and a list of associated languages.
-
-    :param limit: Specifies the maximum number of results to retrieve. If None, no limit
-        is applied.
-    :param offset: Specifies the offset for paginated results. If None, no offset is applied.
-    :return: A dictionary where each key represents an NKCR identifier, and the value is
-        another dictionary containing the item's QID and a list of associated languages.
-        Example structure:
-            {
-              "nkcr_id_1": {"qid": "Q12345", "language": ["en", "cs"]},
-              "nkcr_id_2": {"qid": "Q67890", "language": []},
-            }
-    """
-    non_deprecated_dictionary: dict[dict[str, list, list]] = {}
-
+def get_all_non_deprecated_items_languages(limit: Union[int, None] = None, offset: Union[int, None] = None) -> dict:
     query = """
-    select  ?item ?nkcr ?language where {
+    select ?item ?nkcr ?language where {
         ?item p:P691 [ps:P691 ?nkcr ; wikibase:rank ?rank ] filter(?rank != wikibase:DeprecatedRank) .
         OPTIONAL{?item wdt:P1412 ?language}.
-        # VALUES ?nkcr {'test123' 'xx0313436' 'xx0313312' 'uk20241216330'}
-    }  LIMIT """ + str(limit) + """ OFFSET """ + str(offset) + """
-    """
-    # query_object = mySparql.MySparqlQuery()
-    query_object = mySparql.MySparqlQuery(endpoint="https://query-main.wikidata.org/sparql",
-                                          entity_url='http://www.wikidata.org/entity/')
-    try:
-        data_non_deprecated = query_object.select(query=query, full_data=False)
-    except simplejson.errors.JSONDecodeError:
-        return non_deprecated_dictionary
-    except rapidjson.JSONDecodeError:
-        return non_deprecated_dictionary
-    except pywikibot.exceptions.ServerError:
-        return non_deprecated_dictionary
-
-    if type(data_non_deprecated) is None:
-        return non_deprecated_dictionary
-
-    # non_deprecated_dictionary_cache = []
-    item_non_deprecated: dict[str, Union[
-        pywikibot.data.sparql.URI, pywikibot.data.sparql.Literal, Union[pywikibot.data.sparql.Literal, None], Union[
-            pywikibot.data.sparql.Literal, None]]]
-    for item_non_deprecated in data_non_deprecated:
-        if item_non_deprecated['language'] is not None:
-            language = item_non_deprecated['language'].replace('http://www.wikidata.org/entity/', '')
-        else:
-            language = None
-
-        if non_deprecated_dictionary.get(item_non_deprecated['nkcr'], None):
-            if language is not None:
-                non_deprecated_dictionary[item_non_deprecated['nkcr']]['language'].append(language)
-        else:
-            if language is not None:
-                language_add = [language]
-            else:
-                language_add = []
-
-            non_deprecated_dictionary[item_non_deprecated['nkcr']] = {
-                'qid': item_non_deprecated['item'].replace('http://www.wikidata.org/entity/', ''),
-                'language': language_add,
-            }
-    del data_non_deprecated
-    return non_deprecated_dictionary
+    } LIMIT """ + str(limit) + " OFFSET " + str(offset)
+    return _fetch_non_deprecated_sparql(
+        query, ['language'], ['language'],
+        'get non deprecated items languages')
 
 def get_bot_password(filename):
     """
@@ -1095,7 +715,6 @@ def first_name(name):
         length = len(splits)
         ret = splits[len(splits)-1]
 
-        import re
         regex = r"(.*),\W+([\w‘ \.]*)(,*)"
         matches = re.search(regex, name, re.IGNORECASE)
         try:
@@ -1132,7 +751,6 @@ def last_name(name):
         length = len(splits)
         ret = splits[0]
 
-        import re
         regex = r"(.*),\W+([\w‘ \.]*)(,*)"
         matches = re.search(regex, name, re.IGNORECASE)
         try:

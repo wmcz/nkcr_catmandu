@@ -8,7 +8,8 @@ from property_processor.property_processor_one import PropertyProcessorOne
 from tools import *
 
 wbi_config['USER_AGENT'] = 'Frettiebot/1.0 (https://www.wikidata.org/wiki/User:Frettiebot)'
-login_instance = wbi_login.Login(user='Frettiebot', password='wikibaseintegrator@g3roop93tdhq0gdvku1d079j2pd51ah5')
+bot_password = get_bot_password('bot_password')
+login_instance = wbi_login.Login(user='Frettiebot', password=bot_password)
 wbi = WikibaseIntegrator(login=login_instance, is_bot=True)
 @pytest.mark.parametrize(
     "qid,property_for_new_field,column,value,aut",

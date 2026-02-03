@@ -86,7 +86,6 @@ class Processor:
         else:
             self.instances_from_item = get_claim_from_item_by_property_wbi(self.item, 'P31')
             for instance_from_item in self.instances_from_item:
-                # if instance_from_item.getID() in Config.instances_not_possible_for_nkcr: #pywikibot
                 if instance_from_item in Config.instances_not_possible_for_nkcr:
                     self.save = False
 
@@ -373,20 +372,12 @@ class Processor:
             exist_qid = non_deprecated_items[nkcr_aut]['qid']
             if exist_qid != '':
                 exist_qid = clean_qid(exist_qid)
-                # rewrite label – open all
-                # if self.item is None:
-                #     item_new_field = self.wbi.item.get(exist_qid)
-                #     self.item = item_new_field
-                #     item = self.item
                 if item is not None:
                     self.process_new_fields_wbi(exist_qid, non_deprecated_items[nkcr_aut], row, item)
                 else:
                     self.process_new_fields_wbi(exist_qid, non_deprecated_items[nkcr_aut], row)
             if qid != '' and exist_qid != qid:
                 self.process_new_fields_wbi(None, non_deprecated_items[nkcr_aut], row, item)
-        else:
-            d = ''
-        # log.info('end_proc')
 
     def process_date_type(self, non_deprecated_items):
         """
@@ -411,16 +402,9 @@ class Processor:
             exist_qid = non_deprecated_items[nkcr_aut]['qid']
             if exist_qid != '':
                 exist_qid = clean_qid(exist_qid)
-                # rewrite label – open all
-                # if self.item is None:
-                #     item_new_field = self.wbi.item.get(exist_qid)
-                #     self.item = item_new_field
-                #     item = self.item
                 if item is not None:
                     self.process_new_fields_wbi(exist_qid, non_deprecated_items[nkcr_aut], row, item)
                 else:
                     self.process_new_fields_wbi(exist_qid, non_deprecated_items[nkcr_aut], row)
             if qid != '' and exist_qid != qid:
                 self.process_new_fields_wbi(None, non_deprecated_items[nkcr_aut], row, item)
-        else:
-            d = ''

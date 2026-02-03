@@ -25,7 +25,7 @@ def test_clean_qid(qid):
     ],
 )
 def test_prepare_orcid_from_nkcr(orcid, result_orcid):
-    assert cleaners.prepare_orcid_from_nkcr(orcid) == result_orcid
+    assert cleaners.prepare_orcid_from_nkcr(orcid, '0247a-orcid') == result_orcid
 
 
 @pytest.mark.parametrize(
@@ -51,4 +51,4 @@ def test_clean_last_comma(clean, result_clean):
     ],
 )
 def test_prepare_isni_from_nkcr(isni, result_isni):
-    assert cleaners.prepare_isni_from_nkcr(isni) == result_isni
+    assert cleaners.prepare_isni_from_nkcr(isni, '0247a-isni') == result_isni
