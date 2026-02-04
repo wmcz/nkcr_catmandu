@@ -2,6 +2,7 @@
 # from typing import Union
 
 from context import PipelineContext
+from memory_profiler import log_memory, MemoryTracker, get_object_size_mb
 from tools import *
 log = logging.getLogger(__name__)
 
@@ -69,34 +70,48 @@ class Loader:
                  of data (e.g., network errors, file reading errors).
         """
         log_with_date_time('run')
+        log_memory('Loader.load() start')
 
         context = PipelineContext()
 
         limit_for_occupation = 100000
-        context.name_to_nkcr = load_sparql_query_by_chunks(limit_for_occupation, get_occupations, 'occupations')
+        with MemoryTracker('Loading occupations'):
+            context.name_to_nkcr = load_sparql_query_by_chunks(limit_for_occupation, get_occupations, 'occupations')
         log_with_date_time('occupations read, size: ' + str(len(context.name_to_nkcr)))
+        get_object_size_mb(context.name_to_nkcr, 'name_to_nkcr')
 
-        context.language_dict = load_language_dict_csv()
+        with MemoryTracker('Loading language dict'):
+            context.language_dict = load_language_dict_csv()
         log_with_date_time('loaded language dict from github')
 
-        context.non_deprecated_items_languages = load_sparql_query_by_chunks(self.limit, get_all_non_deprecated_items_languages, 'languages')
+        with MemoryTracker('Loading non_deprecated_items_languages'):
+            context.non_deprecated_items_languages = load_sparql_query_by_chunks(self.limit, get_all_non_deprecated_items_languages, 'languages')
         log_with_date_time('non deprecated items languages used read, size: ' + str(len(context.non_deprecated_items_languages)))
+        get_object_size_mb(context.non_deprecated_items_languages, 'non_deprecated_items_languages')
 
         limit_for_work_and_occupation = 100000
-        context.non_deprecated_items_field_of_work_and_occupation = load_sparql_query_by_chunks(limit_for_work_and_occupation,
-                                                                                             get_all_non_deprecated_items_field_of_work_and_occupation, 'field_of_work_and_occupation')
+        with MemoryTracker('Loading field_of_work_and_occupation'):
+            context.non_deprecated_items_field_of_work_and_occupation = load_sparql_query_by_chunks(limit_for_work_and_occupation,
+                                                                                                 get_all_non_deprecated_items_field_of_work_and_occupation, 'field_of_work_and_occupation')
         log_with_date_time('non deprecated items field of work and occupation read, size: ' + str(len(context.non_deprecated_items_field_of_work_and_occupation)))
+        get_object_size_mb(context.non_deprecated_items_field_of_work_and_occupation, 'non_deprecated_items_field_of_work_and_occupation')
 
-        context.non_deprecated_items_places = load_sparql_query_by_chunks(self.limit, get_all_non_deprecated_items_places, 'places')
+        with MemoryTracker('Loading non_deprecated_items_places'):
+            context.non_deprecated_items_places = load_sparql_query_by_chunks(self.limit, get_all_non_deprecated_items_places, 'places')
         log_with_date_time('non deprecated items places read, size: ' + str(len(context.non_deprecated_items_places)))
+        get_object_size_mb(context.non_deprecated_items_places, 'non_deprecated_items_places')
 
-        context.non_deprecated_items = load_sparql_query_by_chunks(self.limit, get_all_non_deprecated_items, 'non_deprecated_items')
+        with MemoryTracker('Loading non_deprecated_items'):
+            context.non_deprecated_items = load_sparql_query_by_chunks(self.limit, get_all_non_deprecated_items, 'non_deprecated_items')
         log_with_date_time('non deprecated items read, size: ' + str(len(context.non_deprecated_items)))
+        get_object_size_mb(context.non_deprecated_items, 'non_deprecated_items')
 
         context.qid_to_nkcr = make_qid_database(context.non_deprecated_items)
         log_with_date_time('qid_to_nkcr read, size: ' + str(len(context.qid_to_nkcr)))
 
-        context.chunks = load_nkcr_items(self.file_name)
+        with MemoryTracker('Loading CSV chunks'):
+            context.chunks = load_nkcr_items(self.file_name)
         log_with_date_time('nkcr csv read')
 
+        log_memory('Loader.load() complete')
         return context

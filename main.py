@@ -11,6 +11,7 @@ from wikibaseintegrator.wbi_exceptions import MissingEntityException, MWApiError
 import config
 import tools
 from cleaners import clean_qid
+from memory_profiler import start_tracemalloc, log_memory, log_memory_snapshot
 from nkcr_exceptions import BadItemException
 from processor import Processor
 from sources import Loader
@@ -56,6 +57,9 @@ login_instance = wbi_login.Login(user='Frettiebot', password=bot_password)
 wbi = WikibaseIntegrator(login=login_instance, is_bot=True)
 
 if __name__ == '__main__':
+    # Start memory tracking
+    start_tracemalloc()
+    log_memory('Pipeline start')
 
     processor = Processor()
 
@@ -63,6 +67,8 @@ if __name__ == '__main__':
     loader.set_file_name(file_name)
     context = loader.load()
     processor.set_context(context)
+
+    log_memory('After data loading')
 
     head = {'item': 'item', 'prop': 'property', 'value': 'value'}
     write_log(head, True)
@@ -81,6 +87,7 @@ if __name__ == '__main__':
 
             if count % 10000 == 0:
                 log_with_date_time('line: ' + str(count))
+                log_memory(f'Processing row {count}')
 
             if (count % 1000) == 0:
                 log_with_date_time('line: ' + str(count) + ' - ' + nkcr_aut)
@@ -276,6 +283,9 @@ if __name__ == '__main__':
                 log.error(str(e))
             except MWApiError as e:
                 log.error(str(e))
+
+    log_memory('Pipeline complete')
+    log_memory_snapshot('Final memory snapshot', top_n=15)
 
     print(context.not_found_occupations)
     print(context.not_found_places)
