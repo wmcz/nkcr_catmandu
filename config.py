@@ -25,8 +25,8 @@ class Config:
         values point to database property keys.
     """
     user_name: str = 'Frettiebot'
-    debug: bool = False
-    use_json_database: bool = False
+    debug: bool = True
+    use_json_database: bool = True
     count_first_step: int = 0
     count_second_step: int = 0
 
@@ -51,7 +51,8 @@ class Config:
         'Q3400985',
         'Q98834046',
         'Q2963013',
-        'Q42603'
+        'Q42603',
+        'Q45722'
 
     ]
 
