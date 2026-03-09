@@ -222,11 +222,12 @@ if __name__ == '__main__':
 
                         if (processor.get_item().labels.get('cs') is None) and len(row['100a']) > 0:
                             whole_name = tools.first_name(row['100a']) + ' ' + tools.last_name(row['100a'])
-                            processor.get_item().labels.set('cs', whole_name, ActionIfExists.REPLACE_ALL)
-                            log_with_date_time('New CS label for ' + nkcr_aut + ' is ' + whole_name)
-                            changed = True
-                            change_text_array.append('cs label')
-                            label_edit = True
+                            if whole_name != processor.get_item().labels.get('mul'):
+                                processor.get_item().labels.set('cs', whole_name, ActionIfExists.REPLACE_ALL)
+                                log_with_date_time('New CS label for ' + nkcr_aut + ' is ' + whole_name)
+                                changed = True
+                                change_text_array.append('cs label')
+                                label_edit = True
 
                         nkcrs_wd = processor.get_item().claims.get('P691')
                         for nkcr in nkcrs_wd:
