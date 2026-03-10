@@ -23,6 +23,7 @@ import mySparql
 import pywikibot_extension
 from cleaners import clean_last_comma
 from config import Config
+from memory_profiler import get_tracemalloc_usage_mb
 
 if TYPE_CHECKING:
     from context import PipelineContext
@@ -580,7 +581,8 @@ def load_sparql_query_by_chunks(limit: int, get_method, name: str):
         final_data = {}
         while run:
             lim = limit
-
+            current_mem = get_tracemalloc_usage_mb()[0]
+            print('memory_actual: ' + str(current_mem))
             offset = (i * limit)-1
             if (offset < 0):
                 offset = 0
