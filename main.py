@@ -6,7 +6,7 @@ from logging.handlers import TimedRotatingFileHandler, RotatingFileHandler
 
 from wikibaseintegrator.wbi_enums import WikibaseRank
 from wikibaseintegrator.wbi_exceptions import MissingEntityException, MWApiError, ModificationFailed, SaveFailed, \
-    NonExistentEntityError, MaxRetriesReachedException
+    NonExistentEntityError, MaxRetriesReachedException, LoginError
 
 import config
 import tools
@@ -56,6 +56,14 @@ wbi_config['SPARQL_ENDPOINT_URL'] = 'https://query-main.wikidata.org/sparql'
 login_instance = wbi_login.Login(user='Frettiebot', password=bot_password)
 wbi = WikibaseIntegrator(login=login_instance, is_bot=True)
 
+
+def relogin():
+    global wbi, login_instance
+    log.info('LoginError – pokus o opětovné přihlášení...')
+    login_instance = wbi_login.Login(user='Frettiebot', password=bot_password)
+    wbi = WikibaseIntegrator(login=login_instance, is_bot=True)
+    log.info('Přihlášení obnoveno.')
+
 if __name__ == '__main__':
     # Start memory tracking
     start_tracemalloc()
@@ -84,6 +92,8 @@ if __name__ == '__main__':
             nkcr_aut = row['_id']
             save = True
             count = count + 1
+            changed = False
+            change_text_array = []
 
             if count % 10000 == 0:
                 log_with_date_time('line: ' + str(count))
@@ -284,6 +294,19 @@ if __name__ == '__main__':
                 log.error(str(e))
             except MWApiError as e:
                 log.error(str(e))
+            except LoginError as e:
+                log.error('LoginError: ' + str(e))
+                try:
+                    relogin()
+                    # processor.set_wbi(wbi)
+                    if processor.item is not None and changed:
+                        processor.item.write(
+                            summary="Update NK ČR – " + ', '.join(set(change_text_array)),
+                            is_bot=True,
+                            retry_after=10,
+                            tags=['Czech-Authorities-Sync'])
+                except Exception as retry_e:
+                    log.error('Re-login nebo zápis po re-loginu selhal: ' + str(retry_e))
 
     log_memory('Pipeline complete')
     log_memory_snapshot('Final memory snapshot', top_n=15)
