@@ -6,7 +6,8 @@ from logging.handlers import TimedRotatingFileHandler, RotatingFileHandler
 
 from wikibaseintegrator.wbi_enums import WikibaseRank
 from wikibaseintegrator.wbi_exceptions import MissingEntityException, MWApiError, ModificationFailed, SaveFailed, \
-    NonExistentEntityError, MaxRetriesReachedException, LoginError
+    NonExistentEntityError, MaxRetriesReachedException
+from wikibaseintegrator.wbi_login import LoginError
 
 import config
 import tools
