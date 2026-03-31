@@ -22,7 +22,7 @@ class Loader:
     :ivar file_name: Name of the file associated with the data.
     :type file_name: str
     """
-    limit: int = 30000
+    limit: int = 100000
 
     def __init__(self):
         """

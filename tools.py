@@ -276,15 +276,19 @@ def get_occupations(limit: Union[int, None] = None, offset: Union[int, None] = N
     occupation_dictionary: dict[str, str] = {}
 
     try:
-        data_occupation_wbi = wbi_helpers.execute_sparql_query(query=query)
+        data_occupation_wbi = wbi_helpers.execute_sparql_query(query=query, endpoint="https://try.orbopengraph.com/proxy/wdqs/bigdata/namespace/wdq/sparql")
+
     except simplejson.errors.JSONDecodeError as e:
         log_with_date_time('get occupations JSONDecodeError: ' + str(e))
+        raise Exception(str(e))
         return occupation_dictionary
     except requests.exceptions.ConnectionError as e:
         log_with_date_time('get occupations ConnectionError: ' + str(e))
+        raise Exception(str(e))
         return occupation_dictionary
     except Exception as e:
         log_with_date_time('get occupations Exception: ' + str(e))
+        raise Exception(str(e))
         return occupation_dictionary
 
     for item_occupation in data_occupation_wbi['results']['bindings']:
@@ -319,21 +323,28 @@ def _fetch_non_deprecated_sparql(query: str, optional_fields: list[str],
     entity_prefix = 'http://www.wikidata.org/entity/'
     entity_fields_set = set(entity_fields)
 
-    query_object = mySparql.MySparqlQuery(endpoint="https://query-main.wikidata.org/sparql",
+    # query_object = mySparql.MySparqlQuery(endpoint="https://query-main.wikidata.org/sparql",
+    #                                       entity_url=entity_prefix)
+
+    query_object = mySparql.MySparqlQuery(endpoint="https://try.orbopengraph.com/proxy/wdqs/bigdata/namespace/wdq/sparql",
                                           entity_url=entity_prefix)
     try:
         data = query_object.select(query=query, full_data=False)
     except simplejson.errors.JSONDecodeError as e:
         log_with_date_time(f'{log_label} JSONDecodeError: {e}')
+        raise Exception(str(e))
         return result
     except rapidjson.JSONDecodeError as e:
         log_with_date_time(f'{log_label} JSONDecodeError: {e}')
+        raise Exception(str(e))
         return result
     except pywikibot.exceptions.ServerError as e:
         log_with_date_time(f'{log_label} ServerError: {e}')
+        raise Exception(str(e))
         return result
     except requests.exceptions.ConnectionError as e:
         log_with_date_time(f'{log_label} ConnectionError: {e}')
+        raise Exception(str(e))
         return result
 
     if data is None:
@@ -581,6 +592,7 @@ def load_sparql_query_by_chunks(limit: int, get_method, name: str):
         run = True
         final_data = {}
         while run:
+            run_again = False
             lim = limit
             current_mem = get_tracemalloc_usage_mb()[0]
             print('memory_actual: ' + str(current_mem))
@@ -592,7 +604,8 @@ def load_sparql_query_by_chunks(limit: int, get_method, name: str):
             try:
                 data = get_method(lim, offset)
             except Exception as e:
-                data = []
+                #run again
+                run_again = True
             gc.collect()
             if len(final_data) == 0:
                 final_data = data
@@ -601,6 +614,10 @@ def load_sparql_query_by_chunks(limit: int, get_method, name: str):
             if len(data) == 0:
                 run = False
             i = i + 1
+            if run_again:
+                run = True
+                i = i - 1
+
 
         data = final_data
 
