@@ -323,11 +323,11 @@ def _fetch_non_deprecated_sparql(query: str, optional_fields: list[str],
     entity_prefix = 'http://www.wikidata.org/entity/'
     entity_fields_set = set(entity_fields)
 
-    # query_object = mySparql.MySparqlQuery(endpoint="https://query-main.wikidata.org/sparql",
-    #                                       entity_url=entity_prefix)
-
-    query_object = mySparql.MySparqlQuery(endpoint="https://try.orbopengraph.com/proxy/wdqs/bigdata/namespace/wdq/sparql",
+    query_object = mySparql.MySparqlQuery(endpoint="https://query-main.wikidata.org/sparql",
                                           entity_url=entity_prefix)
+
+    # query_object = mySparql.MySparqlQuery(endpoint="https://try.orbopengraph.com/proxy/wdqs/bigdata/namespace/wdq/sparql",
+    #                                       entity_url=entity_prefix)
     try:
         data = query_object.select(query=query, full_data=False)
     except simplejson.errors.JSONDecodeError as e:
