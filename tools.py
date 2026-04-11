@@ -276,7 +276,8 @@ def get_occupations(limit: Union[int, None] = None, offset: Union[int, None] = N
     occupation_dictionary: dict[str, str] = {}
 
     try:
-        data_occupation_wbi = wbi_helpers.execute_sparql_query(query=query, endpoint="https://try.orbopengraph.com/proxy/wdqs/bigdata/namespace/wdq/sparql")
+        # data_occupation_wbi = wbi_helpers.execute_sparql_query(query=query, endpoint="https://try.orbopengraph.com/proxy/wdqs/bigdata/namespace/wdq/sparql")
+        data_occupation_wbi = wbi_helpers.execute_sparql_query(query=query, endpoint="https://query-main.wikidata.org/sparql")
 
     except simplejson.errors.JSONDecodeError as e:
         log_with_date_time('get occupations JSONDecodeError: ' + str(e))
