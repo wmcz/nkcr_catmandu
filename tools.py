@@ -607,6 +607,8 @@ def load_sparql_query_by_chunks(limit: int, get_method, name: str):
             except Exception as e:
                 #run again
                 run_again = True
+                gc.collect()
+                continue
             gc.collect()
             if len(final_data) == 0:
                 final_data = data
