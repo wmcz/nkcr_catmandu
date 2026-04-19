@@ -294,7 +294,21 @@ if __name__ == '__main__':
             except MaxRetriesReachedException as e:
                 log.error(str(e))
             except MWApiError as e:
-                log.error(str(e))
+                msg = str(e)
+                if '"bot" right' in msg or 'permissiondenied' in msg.lower():
+                    log.error('MWApiError – chybí bot právo, pokus o relogin a retry: ' + msg)
+                    try:
+                        relogin()
+                        if processor.item is not None and changed:
+                            processor.item.write(
+                                summary="Update NK ČR – " + ', '.join(set(change_text_array)),
+                                is_bot=True,
+                                retry_after=10,
+                                tags=['Czech-Authorities-Sync'])
+                    except Exception as retry_e:
+                        log.error('Re-login nebo zápis po re-loginu selhal: ' + str(retry_e))
+                else:
+                    log.error(msg)
             except LoginError as e:
                 log.error('LoginError: ' + str(e))
                 try:
