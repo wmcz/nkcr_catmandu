@@ -87,6 +87,7 @@ class Config:
         'Q4167836',
         'Q17362920',
         'Q13406463',
+        'Q16521',
     ]
 
     qid_blacklist:list[str] = [
