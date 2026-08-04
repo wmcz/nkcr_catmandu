@@ -44,9 +44,8 @@ def clean_qid(string: str) -> str:
     :raises BadItemException: If the input string does not start with 'Q' or if it doesn't match
         the expected QID pattern.
     """
-    string = string.replace(')', '').replace('(', '')
-    first_letter = string[0]
-    if first_letter.upper() != 'Q':
+    string = string.replace(')', '').replace('(', '').strip()
+    if len(string) == 0 or string[0].upper() != 'Q':
         raise BadItemException(string)
 
     regex = r"^Q[0-9]+$"
@@ -55,7 +54,7 @@ def clean_qid(string: str) -> str:
     if not match:
         raise BadItemException(string)
 
-    return string
+    return 'Q' + string[1:]
 
 
 def prepare_orcid_from_nkcr(orcid: str, column) -> str:

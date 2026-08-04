@@ -231,7 +231,6 @@ if __name__ == '__main__':
                     if processor.item is not None and Config.debug is not True:
                         change_text_array = []
                         changed = False
-                        label_edit = False
 
                         if (processor.get_item().labels.get('cs') is None) and len(row['100a']) > 0:
                             whole_name = tools.first_name(row['100a']) + ' ' + tools.last_name(row['100a'])
@@ -240,38 +239,37 @@ if __name__ == '__main__':
                                 log_with_date_time('New CS label for ' + nkcr_aut + ' is ' + whole_name)
                                 changed = True
                                 change_text_array.append('cs label')
-                                label_edit = True
 
+                        deprecated_here = False
                         nkcrs_wd = processor.get_item().claims.get('P691')
                         for nkcr in nkcrs_wd:
                             if nkcr.rank == WikibaseRank.DEPRECATED and nkcr.mainsnak.datavalue.get('value') == nkcr_aut:
-                                changed = False
+                                deprecated_here = True
 
-                        if changed is not True or label_edit is True:
-                            for prop in Config.properties.values():
-                                try:
-                                    if (type(prop) is list):
-                                        proplist = prop
-                                        for prop in proplist:
-                                            values = processor.get_item().claims.get(prop)
-                                            for value in values:
-                                                id = value.id
-                                                if (id is None):
-                                                    change_text_array.append(prop)
-                                                    changed = True
-                                    else:
+                        for prop in Config.properties.values():
+                            try:
+                                if (type(prop) is list):
+                                    proplist = prop
+                                    for prop in proplist:
                                         values = processor.get_item().claims.get(prop)
                                         for value in values:
                                             id = value.id
                                             if (id is None):
                                                 change_text_array.append(prop)
                                                 changed = True
-                                except KeyError as e:
-                                    pass
+                                else:
+                                    values = processor.get_item().claims.get(prop)
+                                    for value in values:
+                                        id = value.id
+                                        if (id is None):
+                                            change_text_array.append(prop)
+                                            changed = True
+                            except KeyError as e:
+                                pass
 
                         time_after_save = time.time()
                         # log_with_date_time('time_from_start_to_save_item:' + str(time_after_save - time_start))
-                        if changed:
+                        if changed and not deprecated_here:
                             inserts = inserts + 1
                             # if inserts % 10 == 0:
                             #     log_with_date_time('inserted: ' + str(inserts))
@@ -305,6 +303,7 @@ if __name__ == '__main__':
                             processor.item.write(
                                 summary="Update NK ČR – " + ', '.join(set(change_text_array)),
                                 is_bot=True,
+                                login=login_instance,
                                 retry_after=10,
                                 tags=['Czech-Authorities-Sync'])
                     except Exception as retry_e:
@@ -320,6 +319,7 @@ if __name__ == '__main__':
                         processor.item.write(
                             summary="Update NK ČR – " + ', '.join(set(change_text_array)),
                             is_bot=True,
+                            login=login_instance,
                             retry_after=10,
                             tags=['Czech-Authorities-Sync'])
                 except Exception as retry_e:

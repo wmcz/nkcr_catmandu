@@ -158,15 +158,11 @@ class Processor:
                         death = wd_data['death']
                         if type(row_new_fields[column]) is list:
                             if (len(birth) > 0):
-                                for row_key, row in enumerate(row_new_fields[column]):
-                                    if (row.get('property') in ['P569']):
-                                        del(row_new_fields[column][row_key])
+                                row_new_fields[column] = [dt for dt in row_new_fields[column]
+                                                          if dt.get('property') != 'P569']
                             if (len(death) > 0):
-                                for row_key, row in enumerate(row_new_fields[column]):
-                                    if (row.get('property') in ['P570']):
-                                        del(row_new_fields[column][row_key])
-                        else:
-                            pass
+                                row_new_fields[column] = [dt for dt in row_new_fields[column]
+                                                          if dt.get('property') != 'P570']
                         if len(row_new_fields[column]) == 0:
                             save_time = False
                 if (type(row_new_fields[column]) == dict and row_new_fields[column].get('property') in ['P569', 'P570']):
