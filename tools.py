@@ -3,6 +3,7 @@ import gc
 import logging
 import os
 import re
+import time
 from datetime import datetime
 from json import JSONDecodeError
 from typing import Union, Any, TYPE_CHECKING
@@ -481,6 +482,7 @@ def get_claim_from_item_by_property_wbi(datas: ItemEntity, property_of_item: Any
                     claims_from_data.append(claim.mainsnak.datavalue['value'])
                 elif claim.mainsnak.datatype == WikibaseDatatype.TIME.value:
                     value: dict = claim.mainsnak.datavalue['value']
+                    value.update({'property': prop})
                     claims_from_data.append(value)
                 else:
                     claims_from_data.append(claim.mainsnak.datavalue['value']['id'])
@@ -588,47 +590,40 @@ def load_sparql_query_by_chunks(limit: int, get_method, name: str):
             with open(name + '.json') as infile:
                 data = simplejson.load(infile)
             return data
-    if not os.path.isfile(name + '.json') or Config.debug == False:
-        i = 0
-        run = True
-        final_data = {}
-        while run:
-            run_again = False
-            lim = limit
-            current_mem = get_tracemalloc_usage_mb()[0]
-            print('memory_actual: ' + str(current_mem))
-            offset = (i * limit)-1
-            if (offset < 0):
-                offset = 0
-            if i % 3 == 0:
-                log_with_date_time(get_method.__name__ + ": " + str(offset))
+
+    max_retries = 10
+    retry_sleep_seconds = 30
+    i = 0
+    run = True
+    final_data = {}
+    while run:
+        current_mem = get_tracemalloc_usage_mb()[0]
+        log_with_date_time('memory_actual: ' + str(current_mem))
+        offset = i * limit
+        if i % 3 == 0:
+            log_with_date_time(get_method.__name__ + ": " + str(offset))
+        for attempt in range(1, max_retries + 1):
             try:
-                data = get_method(lim, offset)
+                data = get_method(limit, offset)
+                break
             except Exception as e:
-                #run again
-                run_again = True
+                log_with_date_time(get_method.__name__ + ' offset ' + str(offset) + ' failed (attempt '
+                                   + str(attempt) + '/' + str(max_retries) + '): ' + str(e))
                 gc.collect()
-                continue
-            gc.collect()
-            if len(final_data) == 0:
-                final_data = data
-            else:
-                final_data.update(data)
-            if len(data) == 0:
-                run = False
-            i = i + 1
-            if run_again:
-                run = True
-                i = i - 1
+                if attempt == max_retries:
+                    raise
+                time.sleep(retry_sleep_seconds)
+        gc.collect()
+        final_data.update(data)
+        if len(data) == 0:
+            run = False
+        i = i + 1
 
+    json_object = simplejson.dumps(final_data)
 
-        data = final_data
-
-        json_object = simplejson.dumps(data)
-
-        with open(name + '.json', "w") as outfile:
-            outfile.write(json_object)
-        return data
+    with open(name + '.json', "w") as outfile:
+        outfile.write(json_object)
+    return final_data
 
 
 def load_language_dict_csv() -> dict:

@@ -42,6 +42,7 @@ class PropertyProcessorDates(BasePropertyProcessor):
         qid_claims_direct_from_wd = self.get_qid_claims_direct_from_wd_wbi()
 
         if type(self.row_new_fields[self.column]) is list:
+            added_precisions: dict = {}
             for item_date in self.row_new_fields[self.column]:
                 item_date: dict
                 prop = item_date.get('property')
@@ -54,14 +55,16 @@ class PropertyProcessorDates(BasePropertyProcessor):
                         highest_precisions = 0
                     else:
                         highest_precisions = max(precisions)
+                    highest_precisions = max(highest_precisions, added_precisions.get(prop, 0))
 
                     if (new_item_precision > highest_precisions):
                         self.item_new_field.claims.remove(prop)
-                    self.item_new_field = add_new_field_to_item_wbi(
-                        self.item_new_field,
-                        self.property_for_new_field,
-                        item_date,
-                        self.row_new_fields['_id'])
+                        self.item_new_field = add_new_field_to_item_wbi(
+                            self.item_new_field,
+                            self.property_for_new_field,
+                            item_date,
+                            self.row_new_fields['_id'])
+                        added_precisions[prop] = new_item_precision
         else:
             if type(self.row_new_fields[self.column]) is dict:
                 item_date = self.row_new_fields[self.column]

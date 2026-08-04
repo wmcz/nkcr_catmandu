@@ -119,21 +119,21 @@ if __name__ == '__main__':
                             time_load_item = time.time()
                             # log_with_date_time('time_from_start_to_load_item:' + str(time_load_item-time_start))
                             datas = item
+
+                            if qid in Config.qid_blacklist:
+                                save = False
+                                lab = item.labels.get('cs')
+                                if lab is None:
+                                    lab = item.labels.get('en')
+                                lab_text = lab.value if lab is not None else 'label not in cs and en'
+                                raise ValueError('Blacklistovaná položka: ' + qid + ' – ' + lab_text)
+
                             instances_from_item = get_claim_from_item_by_property_wbi(datas, 'P31')
                             for instance_from_item in instances_from_item:
                                 # if instance_from_item.getID() in Config.instances_not_possible_for_nkcr: #pywikibot
                                 if instance_from_item in Config.instances_not_possible_for_nkcr:
                                     save = False
                                     raise ValueError('Nepovolená instance položky: ' + instance_from_item)
-
-                                if qid in Config.qid_blacklist:
-                                    save = False
-                                    lab = item.labels.get('cs')
-                                    if lab is None:
-                                        lab = item.labels.get('en')
-                                        if lab is None:
-                                            lab = "label not in cz and en"
-                                    raise ValueError('Blacklistovaná položka: ' + qid + ' – ' + lab.value)
                             # nkcr_auts_from_wd = get_nkcr_auts_from_item(datas)
                             nkcr_auts_from_wd = get_nkcr_auts_from_item_wbi(datas)
                             if nkcr_aut not in nkcr_auts_from_wd:
@@ -148,7 +148,9 @@ if __name__ == '__main__':
                                     context.non_deprecated_items[nkcr_aut] = {
                                         'qid': qid,
                                         'isni': [],
-                                        'orcid': []
+                                        'orcid': [],
+                                        'birth': [],
+                                        'death': []
                                     }
                                     context.non_deprecated_items_field_of_work_and_occupation[nkcr_aut] = {
                                         'qid': qid,
