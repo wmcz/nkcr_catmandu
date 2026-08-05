@@ -305,114 +305,264 @@ def get_occupations(limit: Union[int, None] = None, offset: Union[int, None] = N
     return occupation_dictionary
 
 
-def _fetch_non_deprecated_sparql(query: str, optional_fields: list[str],
-                                 entity_fields: list[str], log_label: str) -> dict:
+SPARQL_ENDPOINT = 'https://query-main.wikidata.org/sparql'
+SPARQL_USER_AGENT = 'Frettiebot/1.0 (https://www.wikidata.org/wiki/User:Frettiebot)'
+ENTITY_PREFIX = 'http://www.wikidata.org/entity/'
+
+# Every property the pipeline needs, in one query per batch of authority ids.
+# GROUP_CONCAT keeps it at one row per item; without it the OPTIONALs multiply
+# out (a person with 3 occupations and 2 languages produced 6 rows).
+NKCR_COMBINED_QUERY = """
+select ?item ?nkcr
+       (GROUP_CONCAT(DISTINCT ?isni; separator="|") as ?isnis)
+       (GROUP_CONCAT(DISTINCT ?orcid; separator="|") as ?orcids)
+       (GROUP_CONCAT(DISTINCT ?birth; separator="|") as ?births)
+       (GROUP_CONCAT(DISTINCT ?death; separator="|") as ?deaths)
+       (GROUP_CONCAT(DISTINCT ?field; separator="|") as ?fields)
+       (GROUP_CONCAT(DISTINCT ?occup; separator="|") as ?occups)
+       (GROUP_CONCAT(DISTINCT ?bplace; separator="|") as ?bplaces)
+       (GROUP_CONCAT(DISTINCT ?dplace; separator="|") as ?dplaces)
+       (GROUP_CONCAT(DISTINCT ?wplace; separator="|") as ?wplaces)
+       (GROUP_CONCAT(DISTINCT ?language; separator="|") as ?languages)
+where {
+    VALUES ?nkcr { %s }
+    ?item p:P691 [ps:P691 ?nkcr ; wikibase:rank ?rank ] filter(?rank != wikibase:DeprecatedRank) .
+    OPTIONAL{?item wdt:P213 ?isni}.
+    OPTIONAL{?item wdt:P496 ?orcid}.
+    OPTIONAL{?item wdt:P569 ?birth}.
+    OPTIONAL{?item wdt:P570 ?death}.
+    OPTIONAL{?item wdt:P101 ?field}.
+    OPTIONAL{?item wdt:P106 ?occup}.
+    OPTIONAL{?item wdt:P19 ?bplace}.
+    OPTIONAL{?item wdt:P20 ?dplace}.
+    OPTIONAL{?item wdt:P937 ?wplace}.
+    OPTIONAL{?item wdt:P1412 ?language}.
+} GROUP BY ?item ?nkcr
+"""
+
+# dataset name -> {key in the dataset entry: (variable in the response, is it an entity URI)}
+# The key names are the ones resolve_exist_claims() maps the MARC columns to.
+# Note 'birth'/'death' mean dates in non_deprecated_items but places in places -
+# that is why these stay four separate dictionaries.
+NKCR_DATASET_SPEC: dict[str, dict[str, tuple[str, bool]]] = {
+    'non_deprecated_items': {
+        'isni': ('isnis', False),
+        'orcid': ('orcids', False),
+        'birth': ('births', False),
+        'death': ('deaths', False),
+    },
+    'field_of_work_and_occupation': {
+        'field': ('fields', True),
+        'occup': ('occups', True),
+    },
+    'places': {
+        'birth': ('bplaces', True),
+        'death': ('dplaces', True),
+        'work': ('wplaces', True),
+    },
+    'languages': {
+        'language': ('languages', True),
+    },
+}
+
+
+def execute_sparql_post(query: str, timeout: int = 180) -> dict:
     """
-    Execute a SPARQL query via mySparql and build a dictionary keyed by 'nkcr'.
+    Run a SPARQL query over POST and return the parsed JSON response.
 
-    Each result row must have 'item' and 'nkcr'. Optional fields are collected
-    into lists per nkcr entry. Fields listed in entity_fields have the Wikidata
-    entity URI prefix stripped.
+    POST rather than GET because a VALUES block holding a thousand authority
+    ids does not fit in a URL - the endpoint answers HTTP 414.
 
-    :param query: SPARQL query string (with LIMIT/OFFSET already included).
-    :param optional_fields: Field names to collect from results.
-    :param entity_fields: Subset of optional_fields that are entity URIs
-                          (need 'http://www.wikidata.org/entity/' stripped).
-    :param log_label: Label for error log messages.
-    :return: Dict keyed by nkcr, values are dicts with 'qid' + list fields.
+    :param query: The SPARQL query to run.
+    :param timeout: Socket timeout in seconds.
+    :return: Parsed SPARQL JSON results.
+    :raises requests.HTTPError: On any non-2xx response (429/502/504 included).
     """
-    result: dict = {}
-    entity_prefix = 'http://www.wikidata.org/entity/'
-    entity_fields_set = set(entity_fields)
-
-    query_object = mySparql.MySparqlQuery(endpoint="https://query-main.wikidata.org/sparql",
-                                          entity_url=entity_prefix)
-
-    # query_object = mySparql.MySparqlQuery(endpoint="https://try.orbopengraph.com/proxy/wdqs/bigdata/namespace/wdq/sparql",
-    #                                       entity_url=entity_prefix)
-    try:
-        data = query_object.select(query=query, full_data=False)
-    except simplejson.errors.JSONDecodeError as e:
-        log_with_date_time(f'{log_label} JSONDecodeError: {e}')
-        raise Exception(str(e))
-        return result
-    except rapidjson.JSONDecodeError as e:
-        log_with_date_time(f'{log_label} JSONDecodeError: {e}')
-        raise Exception(str(e))
-        return result
-    except pywikibot.exceptions.ServerError as e:
-        log_with_date_time(f'{log_label} ServerError: {e}')
-        raise Exception(str(e))
-        return result
-    except requests.exceptions.ConnectionError as e:
-        log_with_date_time(f'{log_label} ConnectionError: {e}')
-        raise Exception(str(e))
-        return result
-
-    if data is None:
-        return result
-
-    for row in data:
-        nkcr = row['nkcr']
-
-        parsed = {}
-        for field in optional_fields:
-            val = row[field]
-            if val is not None and field in entity_fields_set:
-                val = val.replace(entity_prefix, '')
-            parsed[field] = val
-
-        if result.get(nkcr):
-            for field in optional_fields:
-                if parsed[field] is not None:
-                    result[nkcr][field].append(parsed[field])
-        else:
-            entry = {'qid': row['item'].replace(entity_prefix, '')}
-            for field in optional_fields:
-                entry[field] = [parsed[field]] if parsed[field] is not None else []
-            result[nkcr] = entry
-
-    del data
-    return result
+    response = requests.post(
+        SPARQL_ENDPOINT,
+        data=query.encode('utf-8'),
+        headers={
+            'User-Agent': SPARQL_USER_AGENT,
+            'Accept': 'application/sparql-results+json',
+            'Content-Type': 'application/sparql-query',
+        },
+        timeout=timeout,
+    )
+    response.raise_for_status()
+    return rapidjson.loads(response.content)
 
 
-def get_all_non_deprecated_items(limit: Union[int, None] = None, offset: Union[int, None] = None) -> dict:
-    query = """
-    select ?item ?nkcr ?isni ?orcid ?birth ?death where {
-        ?item p:P691 [ps:P691 ?nkcr ; wikibase:rank ?rank ] filter(?rank != wikibase:DeprecatedRank) .
-        OPTIONAL{?item wdt:P213 ?isni}.
-        OPTIONAL{?item wdt:P496 ?orcid}.
-        OPTIONAL{?item wdt:P569 ?birth}.
-        OPTIONAL{?item wdt:P570 ?death}.
-    } LIMIT """ + str(limit) + " OFFSET " + str(offset)
-    return _fetch_non_deprecated_sparql(
-        query, ['isni', 'orcid', 'birth', 'death'], [],
-        'get non deprecated items')
+def retry_with_backoff(operation, description: str, max_attempts: int = 15,
+                       initial_wait: int = 15, max_wait: int = 300):
+    """
+    Run an operation, retrying endpoint failures with exponential backoff.
+
+    WDQS answers a busy or over-long query with 429/502/504, or cuts the
+    response mid-stream once it hits its own 60s limit - which surfaces as a
+    JSON parse error. All of those are transient, so they are retried. A
+    production run was observed failing 10 times in a row on one request,
+    hence the generous attempt count.
+
+    :param operation: Zero-argument callable to run.
+    :param description: Label used in log messages.
+    :param max_attempts: How many times to try before giving up.
+    :param initial_wait: Seconds to wait after the first failure.
+    :param max_wait: Upper bound for the growing wait.
+    :return: Whatever operation() returns.
+    :raises Exception: The last failure, once max_attempts is exhausted.
+    """
+    wait = initial_wait
+    for attempt in range(1, max_attempts + 1):
+        try:
+            return operation()
+        except Exception as e:
+            if attempt == max_attempts:
+                log_with_date_time(f'{description} failed permanently after {max_attempts} attempts: {e}')
+                raise
+            log_with_date_time(f'{description} failed (attempt {attempt}/{max_attempts}): {e}'
+                               f' - retrying in {wait}s')
+            gc.collect()
+            time.sleep(wait)
+            wait = min(wait * 2, max_wait)
 
 
-def get_all_non_deprecated_items_field_of_work_and_occupation(limit: Union[int, None] = None, offset: Union[int, None] = None) -> dict:
-    query = """
-    select ?item ?nkcr ?field ?occup where {
-        ?item p:P691 [ps:P691 ?nkcr ; wikibase:rank ?rank ] filter(?rank != wikibase:DeprecatedRank) .
-        OPTIONAL{?item wdt:P101 ?field}.
-        OPTIONAL{?item wdt:P106 ?occup}.
-    } LIMIT """ + str(limit) + " OFFSET " + str(offset)
-    return _fetch_non_deprecated_sparql(
-        query, ['field', 'occup'], ['field', 'occup'],
-        'get non deprecated items field of work and occupation')
+def new_nkcr_datasets() -> dict[str, dict]:
+    """Create the empty dataset dictionaries described by NKCR_DATASET_SPEC."""
+    return {name: {} for name in NKCR_DATASET_SPEC}
 
 
-def get_all_non_deprecated_items_places(limit: Union[int, None] = None, offset: Union[int, None] = None) -> dict:
-    query = """
-    select ?item ?nkcr ?birth ?death ?work where {
-        ?item p:P691 [ps:P691 ?nkcr ; wikibase:rank ?rank ] filter(?rank != wikibase:DeprecatedRank) .
-        OPTIONAL{?item wdt:P19 ?birth}.
-        OPTIONAL{?item wdt:P20 ?death}.
-        OPTIONAL{?item wdt:P937 ?work}.
-    } LIMIT """ + str(limit) + " OFFSET " + str(offset)
-    return _fetch_non_deprecated_sparql(
-        query, ['birth', 'death', 'work'], ['birth', 'death', 'work'],
-        'get non deprecated items places')
+def _split_group_concat(binding: dict, variable: str, strip_entity: bool) -> list:
+    """Split one GROUP_CONCAT cell into values; an empty cell means no values."""
+    raw = binding.get(variable, {}).get('value', '')
+    if not raw:
+        return []
+    values = raw.split('|')
+    if strip_entity:
+        values = [value.replace(ENTITY_PREFIX, '') for value in values]
+    return values
+
+
+def parse_nkcr_bindings(bindings: list, datasets: dict[str, dict]) -> None:
+    """
+    Fold SPARQL result rows into the four dataset dictionaries, in place.
+
+    Where two items carry the same authority id, the first item supplies the
+    qid and the later ones only contribute additional values - matching how
+    the previous loader behaved.
+
+    :param bindings: Result rows from the combined query.
+    :param datasets: Dictionaries to extend, as built by new_nkcr_datasets().
+    """
+    for binding in bindings:
+        nkcr = binding['nkcr']['value']
+        qid = binding['item']['value'].replace(ENTITY_PREFIX, '')
+
+        for name, spec in NKCR_DATASET_SPEC.items():
+            entry = datasets[name].get(nkcr)
+            if entry is None:
+                entry = {'qid': qid}
+                for key in spec:
+                    entry[key] = []
+                datasets[name][nkcr] = entry
+
+            for key, (variable, strip_entity) in spec.items():
+                for value in _split_group_concat(binding, variable, strip_entity):
+                    if value not in entry[key]:
+                        entry[key].append(value)
+
+
+def load_non_deprecated_items_by_nkcr(nkcr_ids: list, batch_size: int = 1000,
+                                      pause_seconds: float = 2) -> dict[str, dict]:
+    """
+    Fetch the Wikidata claims the pipeline needs for the given authority ids.
+
+    Replaces four full-graph queries that paged with LIMIT/OFFSET. Deep OFFSET
+    made the endpoint rescan and discard every skipped row, so past roughly
+    offset 500000 each request ran into the 60s WDQS timeout - measured: the
+    same query answers in 0.7s at offset 0 and returns HTTP 504 at offset
+    500000. A bound VALUES list is served from the index instead and stays
+    around 2-4s regardless of position in the file.
+
+    Batches are kept near a thousand ids because the GROUP BY cost grows
+    faster than linearly: 1100 ids answered in 4.2s, 3000 in 41.6s and 6000
+    timed out.
+
+    :param nkcr_ids: Authority ids to ask about.
+    :param batch_size: Ids per query.
+    :param pause_seconds: Delay between batches, to stay under the rate limit.
+    :return: Dict of the four datasets, keyed by the names in NKCR_DATASET_SPEC.
+    """
+    datasets = new_nkcr_datasets()
+    if not nkcr_ids:
+        return datasets
+
+    batches = [nkcr_ids[start:start + batch_size]
+               for start in range(0, len(nkcr_ids), batch_size)]
+    log_with_date_time(f'nkcr datasets: {len(nkcr_ids)} ids in {len(batches)} batches')
+
+    for number, batch in enumerate(batches, 1):
+        values = ' '.join('"%s"' % nkcr.replace('"', '') for nkcr in batch)
+        query = NKCR_COMBINED_QUERY % values
+
+        data = retry_with_backoff(lambda: execute_sparql_post(query),
+                                  f'nkcr batch {number}/{len(batches)}')
+        parse_nkcr_bindings(data['results']['bindings'], datasets)
+
+        if number % 25 == 0 or number == len(batches):
+            log_with_date_time(f'nkcr batch {number}/{len(batches)}, '
+                               f'{len(datasets["non_deprecated_items"])} items found')
+        if pause_seconds and number < len(batches):
+            time.sleep(pause_seconds)
+
+    return datasets
+
+
+def load_nkcr_ids(file_name) -> list:
+    """
+    Read only the authority ids from the NK ČR CSV, keeping order and dropping duplicates.
+
+    :param file_name: Path to the CSV produced by Catmandu.
+    :return: List of authority ids.
+    """
+    ids: list = []
+    for chunk in pd.read_csv(file_name, usecols=['_id'], dtype={'_id': str}, chunksize=100000):
+        ids.extend(chunk['_id'].dropna().tolist())
+    return list(dict.fromkeys(ids))
+
+
+NKCR_DATASET_CACHE_FILES = {
+    'non_deprecated_items': 'non_deprecated_items.json',
+    'field_of_work_and_occupation': 'field_of_work_and_occupation.json',
+    'places': 'places.json',
+    'languages': 'languages.json',
+}
+
+
+def load_nkcr_datasets(nkcr_ids: list, batch_size: int = 1000,
+                       pause_seconds: float = 2) -> dict[str, dict]:
+    """
+    Load the four datasets, reusing the JSON cache when use_json_database is set.
+
+    :param nkcr_ids: Authority ids to ask about.
+    :param batch_size: Ids per query.
+    :param pause_seconds: Delay between batches.
+    :return: Dict of the four datasets, keyed as in NKCR_DATASET_SPEC.
+    """
+    if Config.use_json_database and all(os.path.isfile(name)
+                                        for name in NKCR_DATASET_CACHE_FILES.values()):
+        datasets = {}
+        for name, file_name in NKCR_DATASET_CACHE_FILES.items():
+            with open(file_name) as infile:
+                datasets[name] = simplejson.load(infile)
+        log_with_date_time('nkcr datasets read from json cache')
+        return datasets
+
+    datasets = load_non_deprecated_items_by_nkcr(nkcr_ids, batch_size, pause_seconds)
+
+    for name, file_name in NKCR_DATASET_CACHE_FILES.items():
+        with open(file_name, 'w') as outfile:
+            outfile.write(simplejson.dumps(datasets[name]))
+    return datasets
 
 
 def load_nkcr_items(file_name) -> pandas.DataFrame:
@@ -591,28 +741,20 @@ def load_sparql_query_by_chunks(limit: int, get_method, name: str):
                 data = simplejson.load(infile)
             return data
 
-    max_retries = 10
-    retry_sleep_seconds = 30
     i = 0
     run = True
     final_data = {}
     while run:
-        current_mem = get_tracemalloc_usage_mb()[0]
-        log_with_date_time('memory_actual: ' + str(current_mem))
         offset = i * limit
         if i % 3 == 0:
-            log_with_date_time(get_method.__name__ + ": " + str(offset))
-        for attempt in range(1, max_retries + 1):
-            try:
-                data = get_method(limit, offset)
-                break
-            except Exception as e:
-                log_with_date_time(get_method.__name__ + ' offset ' + str(offset) + ' failed (attempt '
-                                   + str(attempt) + '/' + str(max_retries) + '): ' + str(e))
-                gc.collect()
-                if attempt == max_retries:
-                    raise
-                time.sleep(retry_sleep_seconds)
+            log_with_date_time(get_method.__name__ + ": " + str(offset)
+                               + ", memory: " + str(get_tracemalloc_usage_mb()[0]))
+        # An exhausted retry raises rather than returning nothing, so an empty
+        # result here really does mean the end of the data - it used to be
+        # indistinguishable from a failed request, which silently truncated
+        # the dataset and cached it.
+        data = retry_with_backoff(lambda: get_method(limit, offset),
+                                  get_method.__name__ + ' offset ' + str(offset))
         gc.collect()
         final_data.update(data)
         if len(data) == 0:
@@ -679,16 +821,6 @@ def download_language_dict_csv() -> str:
 
     return filename
 
-
-def get_all_non_deprecated_items_languages(limit: Union[int, None] = None, offset: Union[int, None] = None) -> dict:
-    query = """
-    select ?item ?nkcr ?language where {
-        ?item p:P691 [ps:P691 ?nkcr ; wikibase:rank ?rank ] filter(?rank != wikibase:DeprecatedRank) .
-        OPTIONAL{?item wdt:P1412 ?language}.
-    } LIMIT """ + str(limit) + " OFFSET " + str(offset)
-    return _fetch_non_deprecated_sparql(
-        query, ['language'], ['language'],
-        'get non deprecated items languages')
 
 def get_bot_password(filename):
     """

@@ -84,27 +84,27 @@ class Loader:
             context.language_dict = load_language_dict_csv()
         log_with_date_time('loaded language dict from github')
 
-        with MemoryTracker('Loading non_deprecated_items_languages'):
-            context.non_deprecated_items_languages = load_sparql_query_by_chunks(self.limit, get_all_non_deprecated_items_languages, 'languages')
-        log_with_date_time('non deprecated items languages used read, size: ' + str(len(context.non_deprecated_items_languages)))
-        get_object_size_mb(context.non_deprecated_items_languages, 'non_deprecated_items_languages')
+        # Only the authorities present in the CSV are ever looked up, and asking
+        # for them by name keeps every query on the index instead of scanning
+        # the whole graph - see load_non_deprecated_items_by_nkcr().
+        nkcr_ids = load_nkcr_ids(self.file_name)
+        log_with_date_time('nkcr ids in csv: ' + str(len(nkcr_ids)))
 
-        limit_for_work_and_occupation = 100000
-        with MemoryTracker('Loading field_of_work_and_occupation'):
-            context.non_deprecated_items_field_of_work_and_occupation = load_sparql_query_by_chunks(limit_for_work_and_occupation,
-                                                                                                 get_all_non_deprecated_items_field_of_work_and_occupation, 'field_of_work_and_occupation')
-        log_with_date_time('non deprecated items field of work and occupation read, size: ' + str(len(context.non_deprecated_items_field_of_work_and_occupation)))
-        get_object_size_mb(context.non_deprecated_items_field_of_work_and_occupation, 'non_deprecated_items_field_of_work_and_occupation')
+        with MemoryTracker('Loading non deprecated items'):
+            datasets = load_nkcr_datasets(nkcr_ids)
 
-        with MemoryTracker('Loading non_deprecated_items_places'):
-            context.non_deprecated_items_places = load_sparql_query_by_chunks(self.limit, get_all_non_deprecated_items_places, 'places')
-        log_with_date_time('non deprecated items places read, size: ' + str(len(context.non_deprecated_items_places)))
-        get_object_size_mb(context.non_deprecated_items_places, 'non_deprecated_items_places')
+        context.non_deprecated_items = datasets['non_deprecated_items']
+        context.non_deprecated_items_field_of_work_and_occupation = datasets['field_of_work_and_occupation']
+        context.non_deprecated_items_places = datasets['places']
+        context.non_deprecated_items_languages = datasets['languages']
 
-        with MemoryTracker('Loading non_deprecated_items'):
-            context.non_deprecated_items = load_sparql_query_by_chunks(self.limit, get_all_non_deprecated_items, 'non_deprecated_items')
-        log_with_date_time('non deprecated items read, size: ' + str(len(context.non_deprecated_items)))
-        get_object_size_mb(context.non_deprecated_items, 'non_deprecated_items')
+        for label, dataset in (('non_deprecated_items', context.non_deprecated_items),
+                               ('non_deprecated_items_field_of_work_and_occupation',
+                                context.non_deprecated_items_field_of_work_and_occupation),
+                               ('non_deprecated_items_places', context.non_deprecated_items_places),
+                               ('non_deprecated_items_languages', context.non_deprecated_items_languages)):
+            log_with_date_time(label + ' read, size: ' + str(len(dataset)))
+            get_object_size_mb(dataset, label)
 
         context.qid_to_nkcr = make_qid_database(context.non_deprecated_items)
         log_with_date_time('qid_to_nkcr read, size: ' + str(len(context.qid_to_nkcr)))
