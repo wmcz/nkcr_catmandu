@@ -17,7 +17,7 @@ from property_processor.property_processor_374a import PropertyProcessor374a
 from property_processor.property_processor_377a import PropertyProcessor377a
 from property_processor.property_processor_dates import PropertyProcessorDates
 from property_processor.property_processor_one import PropertyProcessorOne
-from tools import log_with_date_time, get_claim_from_item_by_property_wbi
+from tools import log_with_date_time, get_claim_from_item_by_property_wbi, get_item_with_retry
 from wikibaseintegrator.datatypes import Item, ExternalID, Time, String
 
 log = logging.getLogger(__name__)
@@ -190,7 +190,7 @@ class Processor:
                 ):
 
                     if self.item is None:
-                        item_new_field = self.wbi.item.get(qid_new_fields)
+                        item_new_field = get_item_with_retry(self.wbi, qid_new_fields)
                         self.item = item_new_field
                     datas_from_wd = self.item
                     self.get_instances_from_item()

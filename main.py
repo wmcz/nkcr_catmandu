@@ -115,7 +115,7 @@ if __name__ == '__main__':
                     try:
                         nkcr_auts = context.qid_to_nkcr.get(qid, [])
                         if nkcr_aut not in nkcr_auts:
-                            item = wbi.item.get(qid)
+                            item = get_item_with_retry(wbi, qid)
                             time_load_item = time.time()
                             # log_with_date_time('time_from_start_to_load_item:' + str(time_load_item-time_start))
                             datas = item
@@ -285,6 +285,12 @@ if __name__ == '__main__':
                 log.error(str(e))
             except requests.exceptions.ConnectionError as e:
                 log.error(str(e))
+            except requests.exceptions.HTTPError as e:
+                # HTTPError is a sibling of ConnectionError, not a subclass, so it
+                # used to escape every handler here and end the run. A rate limit
+                # during a write reaches this point after get_item_with_retry has
+                # already exhausted its waiting; skip the record and carry on.
+                log.error('HTTPError: ' + str(e))
             except SaveFailed as e:
                 log.error(str(e))
             except NonExistentEntityError as e:

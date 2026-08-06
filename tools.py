@@ -392,6 +392,27 @@ def execute_sparql_post(query: str, timeout: int = 180) -> dict:
     return rapidjson.loads(response.content)
 
 
+def _rate_limit_wait(error) -> Union[int, None]:
+    """
+    Seconds the server asked us to wait, if it answered with a rate limit.
+
+    WikibaseIntegrator retries 500/502/503/504 on the MediaWiki API but lets a
+    429 fall straight through to raise_for_status(), so the Retry-After hint
+    has to be read here. Its SPARQL path does handle 429; only the API path
+    does not.
+
+    :param error: The exception raised by the failed call.
+    :return: Seconds to wait, or None when this was not a rate limit.
+    """
+    response = getattr(error, 'response', None)
+    if response is None or getattr(response, 'status_code', None) != 429:
+        return None
+    try:
+        return max(1, int(response.headers.get('Retry-After')))
+    except (AttributeError, TypeError, ValueError):
+        return None
+
+
 def retry_with_backoff(operation, description: str, max_attempts: int = 15,
                        initial_wait: int = 15, max_wait: int = 300):
     """
@@ -402,6 +423,10 @@ def retry_with_backoff(operation, description: str, max_attempts: int = 15,
     JSON parse error. All of those are transient, so they are retried. A
     production run was observed failing 10 times in a row on one request,
     hence the generous attempt count.
+
+    When the server states how long to wait, that wins over the computed
+    backoff, and the backoff is left untouched so one rate limit does not
+    inflate the waits used for later failures.
 
     :param operation: Zero-argument callable to run.
     :param description: Label used in log messages.
@@ -419,11 +444,37 @@ def retry_with_backoff(operation, description: str, max_attempts: int = 15,
             if attempt == max_attempts:
                 log_with_date_time(f'{description} failed permanently after {max_attempts} attempts: {e}')
                 raise
+            requested_wait = _rate_limit_wait(e)
+            sleep_seconds = requested_wait if requested_wait is not None else wait
             log_with_date_time(f'{description} failed (attempt {attempt}/{max_attempts}): {e}'
-                               f' - retrying in {wait}s')
+                               f' - retrying in {sleep_seconds}s')
             gc.collect()
-            time.sleep(wait)
-            wait = min(wait * 2, max_wait)
+            time.sleep(sleep_seconds)
+            if requested_wait is None:
+                wait = min(wait * 2, max_wait)
+
+
+# Replication lag the API may have before it tells us to back off. WikibaseIntegrator
+# already defaults to this value; it is passed explicitly so it is visible and tunable
+# from here rather than depending on a library default.
+API_MAXLAG = 5
+
+
+def get_item_with_retry(wbi, qid: str, description: str = None):
+    """
+    Fetch an item, waiting out API rate limits instead of dying on them.
+
+    A single 429 used to end a whole run: WikibaseIntegrator raises it from
+    raise_for_status() without retrying, and requests.HTTPError was not among
+    the exceptions the main loop caught.
+
+    :param wbi: WikibaseIntegrator instance to fetch with.
+    :param qid: Item id to fetch.
+    :param description: Label used in log messages.
+    :return: The fetched item.
+    """
+    return retry_with_backoff(lambda: wbi.item.get(qid, maxlag=API_MAXLAG),
+                              description or f'item.get({qid})')
 
 
 def new_nkcr_datasets() -> dict[str, dict]:
