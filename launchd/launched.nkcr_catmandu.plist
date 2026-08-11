@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+    Referenční kopie LaunchAgentu. Nasazení:
+
+        cp launchd/launched.nkcr_catmandu.plist ~/Library/LaunchAgents/
+        launchctl bootout   gui/$UID/launched.nkcr_catmandu   # pokud už běží
+        launchctl bootstrap gui/$UID ~/Library/LaunchAgents/launched.nkcr_catmandu.plist
+
+    Jeden běh trvá 8–16 h, proto je naplánovaný jen jednou denně: launchd
+    druhou instanci téhož jobu nespustí a překrytý slot tiše zahodí.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>launched.nkcr_catmandu</string>
+
+    <key>RunAtLoad</key>
+    <false/>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/Users/jirisedlacek/htdocs/nkcr_catmandu/launchd/nkcr_catmandu_run.sh</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/jirisedlacek/htdocs/nkcr_catmandu</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+        <key>LANG</key>
+        <string>en_US.UTF-8</string>
+    </dict>
+
+    <key>StartCalendarInterval</key>
+    <array>
+        <dict>
+            <key>Hour</key>
+            <integer>14</integer>
+            <key>Minute</key>
+            <integer>08</integer>
+        </dict>
+    </array>
+
+    <!-- Wrapper si logy přesměrovává sám do ~/Library/Logs/nkcr_catmandu/.
+         Sem se dostane jen to, co spadne dřív, než k přesměrování dojde. -->
+    <key>StandardOutPath</key>
+    <string>/Users/jirisedlacek/Library/Logs/nkcr_catmandu/launchd.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/jirisedlacek/Library/Logs/nkcr_catmandu/launchd.log</string>
+</dict>
+</plist>
