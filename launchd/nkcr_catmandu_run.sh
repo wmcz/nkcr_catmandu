@@ -61,6 +61,7 @@ echo "=== $(date '+%F %T') start ==="
 started=$(date +%s)
 status=0
 /bin/bash -e "$REPO/local_run.sh" || status=$?
-echo "=== $(date '+%F %T') konec, exit=$status, trvalo $(( ($(date +%s) - started) / 60 )) min ==="
+elapsed=$(( $(date +%s) - started ))
+echo "=== $(date '+%F %T') konec, exit=$status, trvalo $((elapsed / 3600)) h $(((elapsed % 3600) / 60)) min ==="
 
 exit $status
