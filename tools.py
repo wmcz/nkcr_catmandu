@@ -413,7 +413,7 @@ def _rate_limit_wait(error) -> Union[int, None]:
         return None
 
 
-def retry_with_backoff(operation, description: str, max_attempts: int = 15,
+def retry_with_backoff(operation, description: str, max_attempts: int = 30,
                        initial_wait: int = 15, max_wait: int = 300):
     """
     Run an operation, retrying endpoint failures with exponential backoff.
@@ -421,8 +421,10 @@ def retry_with_backoff(operation, description: str, max_attempts: int = 15,
     WDQS answers a busy or over-long query with 429/502/504, or cuts the
     response mid-stream once it hits its own 60s limit - which surfaces as a
     JSON parse error. All of those are transient, so they are retried. A
-    production run was observed failing 10 times in a row on one request,
-    hence the generous attempt count.
+    production run was observed failing 10 times in a row on one request, and
+    longer WDQS outages happen, hence the generous attempt count - with the
+    capped backoff, 30 attempts keep retrying for roughly two hours before
+    giving up.
 
     When the server states how long to wait, that wins over the computed
     backoff, and the backoff is left untouched so one rate limit does not
