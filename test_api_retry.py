@@ -5,6 +5,7 @@ fall through to raise_for_status(), so the waiting has to happen on our side.
 """
 import pytest
 import requests
+from wikibaseintegrator.wbi_exceptions import MissingEntityException, NonExistentEntityError
 
 import tools
 
@@ -75,6 +76,37 @@ def test_server_hint_does_not_inflate_the_backoff(monkeypatch):
 
     tools.retry_with_backoff(flaky, 'test', initial_wait=10, max_wait=100)
     assert waits == [5, 10, 20]
+
+
+def test_missing_entity_is_not_retried(monkeypatch):
+    """A deleted item is missing on every attempt - waiting out the backoff is wasted."""
+    waits = []
+    monkeypatch.setattr(tools.time, 'sleep', lambda s: waits.append(s))
+    attempts = {'n': 0}
+
+    def entity_is_gone():
+        attempts['n'] += 1
+        raise MissingEntityException('The MW API returned that the entity was missing.')
+
+    with pytest.raises(MissingEntityException):
+        tools.retry_with_backoff(entity_is_gone, 'test')
+
+    assert attempts['n'] == 1, 'a missing entity must fail on the first attempt'
+    assert waits == [], 'nothing to wait for'
+
+
+def test_non_existent_entity_is_not_retried(monkeypatch):
+    monkeypatch.setattr(tools.time, 'sleep', lambda s: pytest.fail('must not sleep'))
+    attempts = {'n': 0}
+
+    def no_such_entity():
+        attempts['n'] += 1
+        raise NonExistentEntityError({'code': 'no-such-entity', 'info': 'Could not find such an entity.'})
+
+    with pytest.raises(NonExistentEntityError):
+        tools.retry_with_backoff(no_such_entity, 'test')
+
+    assert attempts['n'] == 1
 
 
 def test_get_item_with_retry_survives_a_rate_limit(monkeypatch):

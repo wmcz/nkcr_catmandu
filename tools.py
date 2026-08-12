@@ -20,6 +20,7 @@ from wikibaseintegrator.datatypes import Item, ExternalID, Time, String
 from wikibaseintegrator.entities import ItemEntity
 from wikibaseintegrator.models import References, Snaks, Claim, Snak, Reference
 from wikibaseintegrator.wbi_enums import WikibaseTimePrecision, WikibaseDatatype, ActionIfExists
+from wikibaseintegrator.wbi_exceptions import MissingEntityException, NonExistentEntityError
 
 import mySparql
 import pywikibot_extension
@@ -413,6 +414,12 @@ def _rate_limit_wait(error) -> Union[int, None]:
         return None
 
 
+# Failures that say "this will never work", not "try again later". A deleted or
+# merged item is missing on every attempt, so retrying it only burns the whole
+# backoff - up to an hour per record - before failing anyway.
+PERMANENT_ERRORS = (MissingEntityException, NonExistentEntityError)
+
+
 def retry_with_backoff(operation, description: str, max_attempts: int = 15,
                        initial_wait: int = 15, max_wait: int = 300):
     """
@@ -422,7 +429,8 @@ def retry_with_backoff(operation, description: str, max_attempts: int = 15,
     response mid-stream once it hits its own 60s limit - which surfaces as a
     JSON parse error. All of those are transient, so they are retried. A
     production run was observed failing 10 times in a row on one request,
-    hence the generous attempt count.
+    hence the generous attempt count. PERMANENT_ERRORS are raised straight
+    away - a missing item stays missing however long we wait.
 
     When the server states how long to wait, that wins over the computed
     backoff, and the backoff is left untouched so one rate limit does not
@@ -440,6 +448,9 @@ def retry_with_backoff(operation, description: str, max_attempts: int = 15,
     for attempt in range(1, max_attempts + 1):
         try:
             return operation()
+        except PERMANENT_ERRORS as e:
+            log_with_date_time(f'{description} failed permanently, not retrying: {e}')
+            raise
         except Exception as e:
             if attempt == max_attempts:
                 log_with_date_time(f'{description} failed permanently after {max_attempts} attempts: {e}')
