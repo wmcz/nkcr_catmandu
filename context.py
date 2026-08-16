@@ -32,6 +32,7 @@ class PipelineContext:
         non_deprecated_items_languages: Items with language claims.
         not_found_occupations: Tracking dict for occupations not found during processing.
         not_found_places: Tracking dict for places not found during processing.
+        not_found_languages: Tracking dict for language codes missing from jazyky.csv.
         subclass_cache: Cache for is_item_subclass_of_wbi SPARQL query results.
         chunks: DataFrame containing NK ČR CSV data in chunks.
     """
@@ -50,6 +51,7 @@ class PipelineContext:
     # Tracking dictionaries (mutated during processing)
     not_found_occupations: dict = field(default_factory=dict)
     not_found_places: dict = field(default_factory=dict)
+    not_found_languages: dict = field(default_factory=dict)
 
     # Cache for subclass queries
     subclass_cache: dict = field(default_factory=dict)
@@ -64,6 +66,10 @@ class PipelineContext:
     def log_not_found_place(self, place: str) -> None:
         """Record a place that was not found in the lookup dictionary."""
         self.not_found_places[place] = self.not_found_places.get(place, 0) + 1
+
+    def log_not_found_language(self, language: str) -> None:
+        """Record a language code that is missing from jazyky.csv."""
+        self.not_found_languages[language] = self.not_found_languages.get(language, 0) + 1
 
     def cache_subclass_result(self, subclass_qid: str, item_qid: str, is_subclass: bool) -> None:
         """Cache the result of a subclass check."""

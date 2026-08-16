@@ -80,6 +80,64 @@ def prepare_orcid_from_nkcr(orcid: str, column) -> str:
         return orcid
 
 
+# Catmandu joins repeated subfields with '$' and repeated MARC fields with '|'
+# (see biografickapole-pro-frettieho.fix), so one CSV value can carry both.
+# Splitting on a single separator left keys like 'cze|cze', which match nothing.
+FIELD_SEPARATORS = re.compile(r'[|$]')
+
+# NK ČR writes places as 'Louny, Česko' while the P1810 qualifier on Wikidata
+# uses 'Louny (Česko)'.
+PLACE_SPECIFIER = re.compile(r'(.*?),\W*(.*)', re.MULTILINE)
+
+
+def split_field_values(value: str) -> list:
+    """
+    Split one CSV cell into the individual MARC values it was joined from.
+
+    :param value: Raw cell as produced by Catmandu.
+    :return: The non-empty parts, in order.
+    """
+    if not isinstance(value, str) or value.strip() == '':
+        return []
+    return [part.strip() for part in FIELD_SEPARATORS.split(value.strip()) if part.strip() != '']
+
+
+def split_occupation_names(occupation_string: str) -> list:
+    """
+    NK ČR terms of a 374a/372a cell, in the form used as the lookup key.
+
+    :param occupation_string: Raw cell from the CSV.
+    :return: List of terms, duplicates kept.
+    """
+    return [clean_last_comma(occupation) for occupation in split_field_values(occupation_string)]
+
+
+def split_language_codes(language_string: str) -> list:
+    """
+    Language codes of a 377a cell, without repeats.
+
+    :param language_string: Raw cell from the CSV.
+    :return: List of codes, first occurrence kept.
+    """
+    return list(dict.fromkeys(split_field_values(language_string)))
+
+
+def split_place_names(place_string: str) -> list:
+    """
+    Place names of a 370a/370b/370f cell, normalised to the Wikidata spelling.
+
+    :param place_string: Raw cell from the CSV.
+    :return: List of place names, duplicates kept.
+    """
+    places = []
+    for place in split_field_values(place_string):
+        if place.find('(') != -1:
+            places.append(place)
+        else:
+            places.append(PLACE_SPECIFIER.sub("\\1 (\\2)", place) or place)
+    return places
+
+
 def prepare_occupation_from_nkcr(occupation_string: str, column, context: 'PipelineContext') -> Union[str, list]:
     """
     Transforms an occupation string by mapping it to its corresponding identifier(s) based on the
@@ -94,24 +152,12 @@ def prepare_occupation_from_nkcr(occupation_string: str, column, context: 'Pipel
     """
     nkcr_to_qid = context.name_to_nkcr
     occupations = []
-    if isinstance(occupation_string, str):
-        if occupation_string.strip() == '':
-            return occupations
-        splitted_occupations = occupation_string.strip().split('|')
-
-        try:
-            occupations = []
-            for occupation in splitted_occupations:
-                occupation = clean_last_comma(occupation)
-                if occupation in nkcr_to_qid:
-                    occupations.append(nkcr_to_qid[occupation])
-                else:
-                    context.log_not_found_occupation(occupation)
-                    log.warning('not found occupation: ' + occupation)
-        except KeyError as e:
-            occupation_key = e.args[0]
-            context.log_not_found_occupation(occupation_key)
-            log.warning('not found occupation: ' + str(e))
+    for occupation in split_occupation_names(occupation_string):
+        if occupation in nkcr_to_qid:
+            occupations.append(nkcr_to_qid[occupation])
+        else:
+            context.log_not_found_occupation(occupation)
+            log.warning('not found occupation: ' + occupation)
     return occupations
 
 def prepare_language_from_nkcr(language_string: str, column, context: 'PipelineContext') -> Union[str, list]:
@@ -131,20 +177,12 @@ def prepare_language_from_nkcr(language_string: str, column, context: 'PipelineC
     """
     nkcr_to_qid = context.language_dict
     languages = []
-    if isinstance(language_string, str):
-        if language_string.strip() == '':
-            return languages
-        splitted_languages = language_string.strip().split('$')
-
-        try:
-            languages = []
-            for language in splitted_languages:
-                if language in nkcr_to_qid:
-                    languages.append(nkcr_to_qid[language])
-                else:
-                    log.warning('not found language: ' + language)
-        except KeyError as e:
-            log.warning('not found language: ' + str(e))
+    for language in split_language_codes(language_string):
+        if language in nkcr_to_qid:
+            languages.append(nkcr_to_qid[language])
+        else:
+            context.log_not_found_language(language)
+            log.warning('not found language: ' + language)
     return languages
 
 def prepare_places_from_nkcr(place_string: str, column, context: 'PipelineContext') -> Union[str, list]:
@@ -165,38 +203,12 @@ def prepare_places_from_nkcr(place_string: str, column, context: 'PipelineContex
     """
     nkcr_to_qid = context.name_to_nkcr
     places: list = []
-    if isinstance(place_string, str):
-        if place_string.strip() == '':
-            return places
-        if ('|' in place_string and '$' not in place_string):
-            splitted_places = place_string.strip().split('|')
+    for corrected_place in split_place_names(place_string):
+        if corrected_place in nkcr_to_qid:
+            places.append(nkcr_to_qid[corrected_place])
         else:
-            splitted_places = place_string.strip().split('$')
-        regex = r"(.*?),\W*(.*)"
-        subst = "\\1 (\\2)"
-        corrected_splitted_places: list = []
-        for place in splitted_places:
-            if (place.strip().find('(') != -1):
-                corrected_splitted_places.append(place)
-            else:
-                result = re.sub(regex, subst, place.strip(), 0, re.MULTILINE)
-
-                if result:
-                    corrected_splitted_places.append(result)
-                else:
-                    corrected_splitted_places.append(place)
-
-        try:
-            places = []
-            for corrected_place in corrected_splitted_places:
-                if corrected_place in nkcr_to_qid:
-                    places.append(nkcr_to_qid[corrected_place])
-                else:
-                    context.log_not_found_place(corrected_place)
-                    log.warning('not found place: ' + corrected_place)
-        except KeyError as e:
             context.log_not_found_place(corrected_place)
-            log.warning('not found place: ' + str(e))
+            log.warning('not found place: ' + corrected_place)
     return places
 
 

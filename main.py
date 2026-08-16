@@ -334,5 +334,4 @@ if __name__ == '__main__':
     log_memory('Pipeline complete')
     log_memory_snapshot('Final memory snapshot', top_n=15)
 
-    print(context.not_found_occupations)
-    print(context.not_found_places)
+    write_not_found_report(context)

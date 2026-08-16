@@ -24,9 +24,8 @@ from wikibaseintegrator.wbi_exceptions import MissingEntityException, NonExisten
 
 import mySparql
 import pywikibot_extension
-from cleaners import clean_last_comma
+from cleaners import clean_last_comma, split_occupation_names, split_place_names
 from config import Config
-from memory_profiler import get_tracemalloc_usage_mb
 
 if TYPE_CHECKING:
     from context import PipelineContext
@@ -51,6 +50,35 @@ def write_log(fields, create_file=False):
         writer = csv.DictWriter(csvfile, fieldnames=['item', 'prop', 'value'])
         writer.writerow(fields)
     log.info(fields)
+
+
+NOT_FOUND_REPORT_FILES = {
+    'not_found_occupations': 'not_found_occupations.csv',
+    'not_found_places': 'not_found_places.csv',
+    'not_found_languages': 'not_found_languages.csv',
+}
+
+
+def write_not_found_report(context: 'PipelineContext') -> None:
+    """
+    Write the terms that could not be linked, most frequent first.
+
+    These used to be two unsorted dicts printed to stdout at the end of the run,
+    which is unusable as a worklist - the interesting terms are the frequent
+    ones, and they were lost among thousands of one-off typos.
+
+    :param context: Pipeline context holding the tracking dictionaries.
+    :return: None
+    """
+    for attribute, file_name in NOT_FOUND_REPORT_FILES.items():
+        terms = getattr(context, attribute)
+        with open(file_name, 'w', newline='') as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow(['term', 'count'])
+            for term, count in sorted(terms.items(), key=lambda pair: (-pair[1], pair[0])):
+                writer.writerow([term, count])
+        log_with_date_time(f'{file_name}: {len(terms)} terms, '
+                           f'{sum(terms.values())} occurrences')
 
 
 def reset_debug_file():
@@ -255,55 +283,122 @@ def make_qid_database(items: dict) -> dict[str, list[str]]:
     return return_qids
 
 
-def get_occupations(limit: Union[int, None] = None, offset: Union[int, None] = None) -> dict[str, str]:
+# The names the pipeline looks up, asked for by name. The P1810 qualifier is
+# what ties a NK ČR term to a Wikidata item, and a bound VALUES list is served
+# from the index. The prefixes keep the answer to subject/geographic
+# authorities, the same ones the old full-graph query selected.
+NAME_TO_QID_QUERY = """
+select distinct ?item ?string where {
+    VALUES ?string { %s }
+    ?s pq:P1810 ?string .
+    ?item p:P691 ?s .
+    ?s wikibase:rank ?rank filter(?rank != wikibase:DeprecatedRank) .
+    ?s ps:P691 ?value filter(strstarts(str(?value),"ph") || strstarts(str(?value),"fd") || strstarts(str(?value),"ge") || strstarts(str(?value),"xx") ) .
+}
+"""
+
+
+SPARQL_LITERAL_ESCAPES = str.maketrans({
+    '\\': '\\\\',
+    '"': '\\"',
+    '\n': '\\n',
+    '\r': '\\r',
+    '\t': '\\t',
+})
+
+
+def sparql_literal(value: str) -> str:
     """
-    Retrieves a dictionary of unique occupations from a SPARQL query by filtering specific
-    prefixes and ensuring only non-deprecated rankings are included. Occupation data includes
-    an identifier value and a string representation for display.
+    Quote a string for use inside a SPARQL VALUES block.
 
-    :param limit: The maximum number of occupations to retrieve. If None, no limit is applied.
-    :param offset: The number of occupations to skip from the start of the query result. If None, no offset is applied.
-    :return: A dictionary where keys are strings (occupation names) and values are occupation item identifiers.
+    NK ČR terms are free text and a stray quote would either break the query or
+    silently drop the term from the batch.
+
+    :param value: The string to quote.
+    :return: The string as a SPARQL literal, escaped and in quotes.
     """
-    query = """
-    select distinct ?item ?value ?string where {
+    return '"%s"' % value.translate(SPARQL_LITERAL_ESCAPES)
 
-        ?item p:P691 ?s .
-        ?s wikibase:rank ?rank filter(?rank != wikibase:DeprecatedRank) .
-        ?s ps:P691 ?value filter(strstarts(str(?value),"ph") || strstarts(str(?value),"fd") || strstarts(str(?value),"ge") || strstarts(str(?value),"xx") ) .
-        ?s pq:P1810 ?string .
-    } LIMIT """ + str(limit) + """ OFFSET """ + str(offset) + """
+
+def load_names_to_qid(names: list, batch_size: int = 1000,
+                      pause_seconds: float = 2) -> dict[str, str]:
     """
+    Map NK ČR occupation, field-of-work and place names to Wikidata items.
 
-    occupation_dictionary: dict[str, str] = {}
+    Replaces a full-graph query that paged with LIMIT/OFFSET. SPARQL only
+    guarantees a stable order under ORDER BY, so every run got a slightly
+    different slice of the same data - measured across runs the dictionary held
+    199741, 202423 and 201471 entries, and terms that dropped out were reported
+    as 'not found' although they are linked on Wikidata. Adding ORDER BY is not
+    an option either: the endpoint then has to sort the whole result set and
+    times out after 60s.
 
-    try:
-        # data_occupation_wbi = wbi_helpers.execute_sparql_query(query=query, endpoint="https://try.orbopengraph.com/proxy/wdqs/bigdata/namespace/wdq/sparql")
-        data_occupation_wbi = wbi_helpers.execute_sparql_query(query=query, endpoint="https://query-main.wikidata.org/sparql")
+    Asking by name instead returns exactly what the CSV needs, always the same
+    way, and the answer is a fraction of the 200k rows loaded before. Measured
+    against query-main: 100 names answered in 1.4s, 1000 in 1.5s - the cost is
+    in the request, not the batch, so batches are kept large.
 
-    except simplejson.errors.JSONDecodeError as e:
-        log_with_date_time('get occupations JSONDecodeError: ' + str(e))
-        raise Exception(str(e))
-        return occupation_dictionary
-    except requests.exceptions.ConnectionError as e:
-        log_with_date_time('get occupations ConnectionError: ' + str(e))
-        raise Exception(str(e))
-        return occupation_dictionary
-    except Exception as e:
-        log_with_date_time('get occupations Exception: ' + str(e))
-        raise Exception(str(e))
-        return occupation_dictionary
+    :param names: NK ČR terms to look up, as they appear in the CSV.
+    :param batch_size: Names per query.
+    :param pause_seconds: Delay between batches, to stay under the rate limit.
+    :return: Dict of name -> QID, holding only the names that are linked.
+    """
+    name_to_qid: dict[str, str] = {}
+    if not names:
+        return name_to_qid
 
-    for item_occupation in data_occupation_wbi['results']['bindings']:
-        if item_occupation['string'] is not None:
-            name = item_occupation['string']['value']
-        else:
-            name = None
+    unique_names = list(dict.fromkeys(names))
+    batches = [unique_names[start:start + batch_size]
+               for start in range(0, len(unique_names), batch_size)]
+    log_with_date_time(f'names: {len(unique_names)} terms in {len(batches)} batches')
 
-        if item_occupation['item']['value']:
-            occupation_dictionary[name] = item_occupation['item']['value'].replace('http://www.wikidata.org/entity/', '')
+    for number, batch in enumerate(batches, 1):
+        values = ' '.join(sparql_literal(name) for name in batch)
+        query = NAME_TO_QID_QUERY % values
 
-    return occupation_dictionary
+        data = retry_with_backoff(lambda: execute_sparql_post(query),
+                                  f'names batch {number}/{len(batches)}')
+        for binding in data['results']['bindings']:
+            name_to_qid[binding['string']['value']] = \
+                binding['item']['value'].replace(ENTITY_PREFIX, '')
+
+        if number % 25 == 0 or number == len(batches):
+            log_with_date_time(f'names batch {number}/{len(batches)}, '
+                               f'{len(name_to_qid)} terms linked')
+        if pause_seconds and number < len(batches):
+            time.sleep(pause_seconds)
+
+    return name_to_qid
+
+
+# The CSV columns whose values are looked up by name, and the splitter that
+# turns a cell into those lookup keys. Must stay in sync with the columns
+# cleaners.resolve_property_to_function() sends to the same splitters.
+NAME_COLUMNS = {
+    '374a': split_occupation_names,
+    '372a': split_occupation_names,
+    '370a': split_place_names,
+    '370b': split_place_names,
+    '370f': split_place_names,
+}
+
+
+def load_names_from_csv(file_name) -> list:
+    """
+    Collect every occupation, field-of-work and place term used by the CSV.
+
+    :param file_name: Path to the CSV produced by Catmandu.
+    :return: List of terms, without duplicates, in the order first seen.
+    """
+    names: list = []
+    columns = list(NAME_COLUMNS)
+    for chunk in pd.read_csv(file_name, usecols=lambda column: column in columns,
+                             dtype=str, chunksize=100000):
+        for column in chunk.columns:
+            split = NAME_COLUMNS[column]
+            for value in chunk[column].dropna().tolist():
+                names.extend(split(value))
+    return list(dict.fromkeys(names))
 
 
 SPARQL_ENDPOINT = 'https://query-main.wikidata.org/sparql'
@@ -374,6 +469,10 @@ def execute_sparql_post(query: str, timeout: int = 180) -> dict:
     POST rather than GET because a VALUES block holding a thousand authority
     ids does not fit in a URL - the endpoint answers HTTP 414.
 
+    The charset must be stated: without it the endpoint reads the body as
+    Latin-1 and every accented literal silently stops matching - "filozofie"
+    was found while "Příbram (Česko)" was not.
+
     :param query: The SPARQL query to run.
     :param timeout: Socket timeout in seconds.
     :return: Parsed SPARQL JSON results.
@@ -385,7 +484,7 @@ def execute_sparql_post(query: str, timeout: int = 180) -> dict:
         headers={
             'User-Agent': SPARQL_USER_AGENT,
             'Accept': 'application/sparql-results+json',
-            'Content-Type': 'application/sparql-query',
+            'Content-Type': 'application/sparql-query; charset=utf-8',
         },
         timeout=timeout,
     )
@@ -780,54 +879,31 @@ def log_with_date_time(message: str = ''):
     log.info(message)
 
 
-def load_sparql_query_by_chunks(limit: int, get_method, name: str):
+NAME_CACHE_FILE = 'occupations.json'
+
+
+def load_name_dictionary(file_name, batch_size: int = 1000,
+                         pause_seconds: float = 2) -> dict[str, str]:
     """
-    Loads SPARQL query results in chunks, processes them in a paginated manner, and stores the results
-    either in memory or as a JSON file. If the results are already cached in a JSON file and caching
-    is enabled, the function retrieves them directly from the file.
+    Build the name -> QID dictionary for one CSV, reusing the JSON cache when
+    use_json_database is set.
 
-    :param limit: The maximum number of records to be fetched in each chunk.
-    :type limit: int
-    :param get_method: The method used to retrieve the data in chunks. It must take `limit`
-                       and `offset` as arguments and return a chunk of data.
-    :type get_method: Callable
-    :param name: The base name of the JSON file used for caching the query results. The `.json`
-                 extension will be appended automatically.
-    :type name: str
-    :return: A dictionary containing the aggregated SPARQL query results.
-    :rtype: dict
+    :param file_name: Path to the CSV produced by Catmandu.
+    :param batch_size: Names per query.
+    :param pause_seconds: Delay between batches.
+    :return: Dict of NK ČR term -> QID.
     """
-    if Config.use_json_database:
-        if os.path.isfile(name + '.json'):
-            with open(name + '.json') as infile:
-                data = simplejson.load(infile)
-            return data
+    if Config.use_json_database and os.path.isfile(NAME_CACHE_FILE):
+        with open(NAME_CACHE_FILE) as infile:
+            names = simplejson.load(infile)
+        log_with_date_time('names read from json cache')
+        return names
 
-    i = 0
-    run = True
-    final_data = {}
-    while run:
-        offset = i * limit
-        if i % 3 == 0:
-            log_with_date_time(get_method.__name__ + ": " + str(offset)
-                               + ", memory: " + str(get_tracemalloc_usage_mb()[0]))
-        # An exhausted retry raises rather than returning nothing, so an empty
-        # result here really does mean the end of the data - it used to be
-        # indistinguishable from a failed request, which silently truncated
-        # the dataset and cached it.
-        data = retry_with_backoff(lambda: get_method(limit, offset),
-                                  get_method.__name__ + ' offset ' + str(offset))
-        gc.collect()
-        final_data.update(data)
-        if len(data) == 0:
-            run = False
-        i = i + 1
+    names = load_names_to_qid(load_names_from_csv(file_name), batch_size, pause_seconds)
 
-    json_object = simplejson.dumps(final_data)
-
-    with open(name + '.json', "w") as outfile:
-        outfile.write(json_object)
-    return final_data
+    with open(NAME_CACHE_FILE, 'w') as outfile:
+        outfile.write(simplejson.dumps(names))
+    return names
 
 
 def load_language_dict_csv() -> dict:

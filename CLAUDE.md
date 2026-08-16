@@ -51,7 +51,7 @@ NK ČR MARC XML → Catmandu (Perl) → output.csv → main.py → Wikidata API
 ### Core Modules
 
 - **`main.py`** — Entry point. Initializes WBI login, loads data via `Loader`, iterates CSV rows, delegates property processing to `Processor`, and writes changed items to Wikidata with `Czech-Authorities-Sync` tag.
-- **`sources.py` (`Loader`)** — Loads all reference data at startup: SPARQL queries for existing Wikidata items (non-deprecated NK ČR authorities, occupations, languages, places, field-of-work), language dictionary from CSV, and the NK ČR CSV in 30,000-row chunks.
+- **`sources.py` (`Loader`)** — Loads all reference data at startup: SPARQL queries for existing Wikidata items (non-deprecated NK ČR authorities, occupations, languages, places, field-of-work), language dictionary from CSV, and the NK ČR CSV in 30,000-row chunks. Every SPARQL load is bound to what the CSV actually contains — authority ids for the claim datasets, occupation/place terms for the name dictionary — and sent in `VALUES` batches. Full-graph queries paged with `LIMIT/OFFSET` are not usable here: without `ORDER BY` the endpoint returns a different slice each run, and with it the query times out.
 - **`processor.py` (`Processor`)** — Coordinates processing of a single authority record. Dispatches to specialized property processors based on MARC field column. Checks blacklists and instance types before processing.
 - **`config.py` (`Config`)** — Central configuration: QID blacklist, excluded occupations/instances, and the MARC-to-Wikidata property mapping.
 - **`cleaners.py`** — Validation and data cleaning: QID/ORCID/ISNI format validation, occupation/place resolution via cached SPARQL lookups, date parsing from MARC fields.
@@ -84,7 +84,11 @@ Each MARC field has a dedicated processor inheriting from `PropertyProcessor` (b
 
 ### Caching
 
-The pipeline caches large SPARQL query results as JSON files: `non_deprecated_items.json`, `languages.json`, `occupations.json`, `field_of_work_and_occupation.json`. These are loaded at startup and can be 50-120MB each.
+The pipeline caches large SPARQL query results as JSON files: `non_deprecated_items.json`, `languages.json`, `occupations.json`, `field_of_work_and_occupation.json`. These are loaded at startup and can be 50-120MB each. The cache is keyed by nothing but the file name, so it must be deleted after the input CSV changes.
+
+### Not-found reports
+
+At the end of a run the terms that could not be linked are written, most frequent first, to `not_found_occupations.csv`, `not_found_places.csv` and `not_found_languages.csv`. They are the worklist for fixing links on Wikidata (usually a missing `P1810` qualifier on an item that already exists) and for the language codes missing from `jazyky.csv`, which is maintained in the `wmcz/WMCZ-scripts` repository.
 
 ## Important Conventions
 

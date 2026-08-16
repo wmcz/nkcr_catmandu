@@ -74,9 +74,10 @@ class Loader:
 
         context = PipelineContext()
 
-        limit_for_occupation = 100000
+        # Only the terms the CSV actually uses are looked up - see
+        # load_names_to_qid() for why the full-graph query had to go.
         with MemoryTracker('Loading occupations'):
-            context.name_to_nkcr = load_sparql_query_by_chunks(limit_for_occupation, get_occupations, 'occupations')
+            context.name_to_nkcr = load_name_dictionary(self.file_name)
         log_with_date_time('occupations read, size: ' + str(len(context.name_to_nkcr)))
         get_object_size_mb(context.name_to_nkcr, 'name_to_nkcr')
 
