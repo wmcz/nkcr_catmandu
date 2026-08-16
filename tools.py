@@ -387,18 +387,25 @@ def load_names_from_csv(file_name) -> list:
     """
     Collect every occupation, field-of-work and place term used by the CSV.
 
+    A production dump holds around 1.2 million records, so the terms are
+    deduplicated as they are read - the same few tens of thousands of terms
+    repeat over and over, and collecting them first would mean millions of
+    strings in memory for nothing.
+
     :param file_name: Path to the CSV produced by Catmandu.
     :return: List of terms, without duplicates, in the order first seen.
     """
-    names: list = []
+    names: dict = {}
     columns = list(NAME_COLUMNS)
     for chunk in pd.read_csv(file_name, usecols=lambda column: column in columns,
                              dtype=str, chunksize=100000):
         for column in chunk.columns:
             split = NAME_COLUMNS[column]
             for value in chunk[column].dropna().tolist():
-                names.extend(split(value))
-    return list(dict.fromkeys(names))
+                for name in split(value):
+                    names[name] = None
+        gc.collect()
+    return list(names)
 
 
 SPARQL_ENDPOINT = 'https://query-main.wikidata.org/sparql'
