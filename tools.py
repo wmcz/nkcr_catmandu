@@ -577,6 +577,40 @@ def retry_with_backoff(operation, description: str, max_attempts: int = 15,
 API_MAXLAG = 5
 
 
+# (connect, read) timeout for every MediaWiki API request. WikibaseIntegrator sends
+# them without one, and a write that met a connection the server had already closed
+# then waited forever: a run hung for 8 days on a socket in CLOSE_WAIT, and launchd
+# started no further run while it was alive. A read can legitimately take a while
+# when a large item is saved, hence the generous read part.
+API_TIMEOUT = (15, 300)
+
+
+class _TimeoutAdapter(requests.adapters.HTTPAdapter):
+    """HTTPAdapter that applies API_TIMEOUT to requests that set no timeout."""
+
+    def send(self, request, **kwargs):
+        if kwargs.get('timeout') is None:
+            kwargs['timeout'] = API_TIMEOUT
+        return super().send(request, **kwargs)
+
+
+def apply_api_timeout(session: requests.Session) -> requests.Session:
+    """
+    Give every request on the session a default timeout.
+
+    requests has no session-wide timeout, and WikibaseIntegrator offers no way to
+    pass one to some of its calls (the edit token refresh in particular), so it is
+    set on the transport instead.
+
+    :param session: Session to patch in place.
+    :return: The same session.
+    """
+    adapter = _TimeoutAdapter()
+    session.mount('https://', adapter)
+    session.mount('http://', adapter)
+    return session
+
+
 def get_item_with_retry(wbi, qid: str, description: str = None):
     """
     Fetch an item, waiting out API rate limits instead of dying on them.
