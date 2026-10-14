@@ -990,12 +990,12 @@ def download_language_dict_csv() -> str:
 
     try:
     # creating HTTP response object from given url
-        resp = requests.get(url)
+        resp = requests.get(url, timeout=API_TIMEOUT)
 
         # saving the xml file
         with open(filename, 'wb') as f:
             f.write(resp.content)
-    except requests.ConnectionError:
+    except (requests.ConnectionError, requests.Timeout):
         filename = "jazyky_default.csv"
 
     return filename

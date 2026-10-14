@@ -54,7 +54,10 @@ bot_password = get_bot_password('bot_password')
 
 wbi_config['USER_AGENT'] = 'Frettiebot/1.0 (https://www.wikidata.org/wiki/User:Frettiebot)'
 wbi_config['SPARQL_ENDPOINT_URL'] = 'https://query-main.wikidata.org/sparql'
+# default_session carries anonymous API calls, helpers_session the SPARQL queries
+# of wbi_helpers.execute_sparql_query (the occupation subclass check)
 apply_api_timeout(wbi_helpers.default_session)
+apply_api_timeout(wbi_helpers.helpers_session)
 login_instance = wbi_login.Login(user='Frettiebot', password=bot_password, timeout=API_TIMEOUT)
 apply_api_timeout(login_instance.get_session())
 wbi = WikibaseIntegrator(login=login_instance, is_bot=True)
