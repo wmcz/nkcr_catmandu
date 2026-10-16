@@ -284,6 +284,7 @@ if __name__ == '__main__':
                                 summary="Update NK ČR – " + ', '.join(set(change_text_array)),
                                 is_bot=True,
                                 retry_after=10,
+                                maxlag=API_MAXLAG,
                                 tags=['Czech-Authorities-Sync'])
             except BadItemException as e:
                 log.error(str(e))
@@ -319,6 +320,7 @@ if __name__ == '__main__':
                                 is_bot=True,
                                 login=login_instance,
                                 retry_after=10,
+                                maxlag=API_MAXLAG,
                                 tags=['Czech-Authorities-Sync'])
                     except Exception as retry_e:
                         log.error('Re-login nebo zápis po re-loginu selhal: ' + str(retry_e))
@@ -335,6 +337,7 @@ if __name__ == '__main__':
                             is_bot=True,
                             login=login_instance,
                             retry_after=10,
+                            maxlag=API_MAXLAG,
                             tags=['Czech-Authorities-Sync'])
                 except Exception as retry_e:
                     log.error('Re-login nebo zápis po re-loginu selhal: ' + str(retry_e))

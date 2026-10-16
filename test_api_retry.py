@@ -126,7 +126,8 @@ def test_get_item_with_retry_survives_a_rate_limit(monkeypatch):
 
     assert tools.get_item_with_retry(FakeWbi(), 'Q42') == 'item:Q42'
     assert calls['n'] == 2
-    assert calls['kwargs'].get('maxlag') == tools.API_MAXLAG, 'maxlag must be sent explicitly'
+    assert calls['kwargs'].get('maxlag') == tools.API_READ_MAXLAG, 'maxlag must be sent explicitly'
+    assert tools.API_READ_MAXLAG == 0, 'a read must not wait for the query service lag'
 
 
 def test_get_item_with_retry_gives_up_eventually(monkeypatch):

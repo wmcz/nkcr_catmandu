@@ -571,10 +571,16 @@ def retry_with_backoff(operation, description: str, max_attempts: int = 15,
                 wait = min(wait * 2, max_wait)
 
 
-# Replication lag the API may have before it tells us to back off. WikibaseIntegrator
-# already defaults to this value; it is passed explicitly so it is visible and tunable
-# from here rather than depending on a library default.
+# Replication lag the API may have before it tells us to back off on a write.
+# WikibaseIntegrator already defaults to this value; it is passed explicitly so it is
+# visible and tunable from here rather than depending on a library default.
 API_MAXLAG = 5
+
+# Reads are sent without maxlag (0 makes WikibaseIntegrator leave it out). On Wikidata
+# maxlag includes the query service lag divided by 60, which since March 2026 sits
+# above 5 for hours (T421642) - a read waited on it as long as a write did, although
+# fetching an item adds nothing to that lag. Pywikibot also relaxed it for reads.
+API_READ_MAXLAG = 0
 
 
 # (connect, read) timeout for every MediaWiki API request. WikibaseIntegrator sends
@@ -624,7 +630,7 @@ def get_item_with_retry(wbi, qid: str, description: str = None):
     :param description: Label used in log messages.
     :return: The fetched item.
     """
-    return retry_with_backoff(lambda: wbi.item.get(qid, maxlag=API_MAXLAG),
+    return retry_with_backoff(lambda: wbi.item.get(qid, maxlag=API_READ_MAXLAG),
                               description or f'item.get({qid})')
 
 
