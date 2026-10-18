@@ -6,8 +6,7 @@
 /apicache
 *.pyc
 *.log
-*.log.1
-*.log.2
+*.log.*
 *.lwp
 *.csv
 /__pycache__
