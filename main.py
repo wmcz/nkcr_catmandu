@@ -50,20 +50,26 @@ log.info("Input file: %s" % args.input)
 print_info(config.Config.debug)
 gc.enable()
 
-bot_password = get_bot_password('bot_password')
+oauth2_client_id, oauth2_client_secret = get_oauth2_credentials('oauth2_credentials')
 
 wbi_config['USER_AGENT'] = 'Frettiebot/1.0 (https://www.wikidata.org/wiki/User:Frettiebot)'
 wbi_config['SPARQL_ENDPOINT_URL'] = 'https://query-main.wikidata.org/sparql'
-login_instance = wbi_login.Login(user='Frettiebot', password=bot_password)
+login_instance = wbi_login.OAuth2(consumer_token=oauth2_client_id, consumer_secret=oauth2_client_secret)
 wbi = WikibaseIntegrator(login=login_instance, is_bot=True)
 
 
 def relogin():
     global wbi, login_instance
-    log.info('LoginError – pokus o opětovné přihlášení...')
-    login_instance = wbi_login.Login(user='Frettiebot', password=bot_password)
+    log.info('Logging in to Wikidata again...')
+    login_instance = wbi_login.OAuth2(consumer_token=oauth2_client_id, consumer_secret=oauth2_client_secret)
     wbi = WikibaseIntegrator(login=login_instance, is_bot=True)
-    log.info('Přihlášení obnoveno.')
+    log.info('Logged in again.')
+
+
+def token_expires_soon(margin=300):
+    # The 4 h token is sent with reads too, an expired one would fail the record being read.
+    expires_at = login_instance.get_session().token.get('expires_at')
+    return expires_at is not None and time.time() > expires_at - margin
 
 if __name__ == '__main__':
     # Start memory tracking
@@ -89,6 +95,8 @@ if __name__ == '__main__':
         chunk.fillna('', inplace=True)
         chunk = chunk[chunk['100a'] != '']
         for row in chunk.to_dict('records'):
+            if token_expires_soon():
+                relogin()
             time_start = time.time()
             nkcr_aut = row['_id']
             save = True
@@ -301,11 +309,11 @@ if __name__ == '__main__':
                 log.error(str(e))
             except MWApiError as e:
                 msg = str(e)
-                if '"bot" right' in msg or 'permissiondenied' in msg.lower():
+                if '"bot" right' in msg or 'permissiondenied' in msg.lower() or 'mwoauth-invalid-authorization' in msg:
                     log.error('MWApiError – chybí bot právo, pokus o relogin a retry: ' + msg)
                     try:
                         relogin()
-                        if processor.item is not None and changed:
+                        if processor.item is not None and changed and Config.debug is not True:
                             processor.item.write(
                                 summary="Update NK ČR – " + ', '.join(set(change_text_array)),
                                 is_bot=True,
@@ -321,7 +329,7 @@ if __name__ == '__main__':
                 try:
                     relogin()
                     # processor.set_wbi(wbi)
-                    if processor.item is not None and changed:
+                    if processor.item is not None and changed and Config.debug is not True:
                         processor.item.write(
                             summary="Update NK ČR – " + ', '.join(set(change_text_array)),
                             is_bot=True,

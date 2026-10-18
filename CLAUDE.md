@@ -92,7 +92,7 @@ At the end of a run the terms that could not be linked are written, most frequen
 
 ## Important Conventions
 
-- Bot credentials are stored in `bot_password` (not committed to git)
+- Bot credentials are the OAuth 2 owner-only consumer in `oauth2_credentials` (client id and client secret on two lines, not committed to git); the old `bot_password` is no longer used
 - The `Config.debug` flag (default `False`) prevents writes to Wikidata when `True`
 - All Wikidata edits use the tag `Czech-Authorities-Sync` and `is_bot=True`
 - SPARQL queries target `https://query-main.wikidata.org/sparql`

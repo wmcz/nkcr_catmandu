@@ -967,23 +967,23 @@ def download_language_dict_csv() -> str:
     return filename
 
 
-def get_bot_password(filename):
+def get_oauth2_credentials(filename):
     """
-    Reads the first line of a given file to obtain the bot password.
+    Reads the OAuth 2 client id (first line) and client secret (second line)
+    of an owner-only consumer registered at
+    Special:OAuthConsumerRegistration/propose/oauth2.
 
-    The function opens the specified file, reads its first line, and
-    returns the content of that line. It assumes the file exists and
-    is readable. This is useful for retrieving sensitive data such
-    as passwords from files in a consistent manner.
-
-    :param filename: The path to the file containing the bot password.
+    :param filename: The path to the file containing the credentials.
     :type filename: str
-    :return: The first line of the file, typically the bot password.
-    :rtype: str
+    :return: Tuple (client_id, client_secret).
+    :rtype: tuple[str, str]
     """
     with open(filename, 'r') as file:
-        first_line = file.readline()
-    return first_line
+        lines = [line.strip() for line in file if line.strip()]
+    if len(lines) < 2:
+        raise ValueError(filename + ' must contain the client id and the client secret on two lines')
+    return lines[0], lines[1]
+
 
 def first_name(name):
     """
