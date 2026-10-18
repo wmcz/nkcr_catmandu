@@ -571,10 +571,50 @@ def retry_with_backoff(operation, description: str, max_attempts: int = 15,
                 wait = min(wait * 2, max_wait)
 
 
-# Replication lag the API may have before it tells us to back off. WikibaseIntegrator
-# already defaults to this value; it is passed explicitly so it is visible and tunable
-# from here rather than depending on a library default.
+# Replication lag the API may have before it tells us to back off on a write.
+# WikibaseIntegrator already defaults to this value; it is passed explicitly so it is
+# visible and tunable from here rather than depending on a library default.
 API_MAXLAG = 5
+
+# Reads are sent without maxlag (0 makes WikibaseIntegrator leave it out). On Wikidata
+# maxlag includes the query service lag divided by 60, which since March 2026 sits
+# above 5 for hours (T421642) - a read waited on it as long as a write did, although
+# fetching an item adds nothing to that lag. Pywikibot also relaxed it for reads.
+API_READ_MAXLAG = 0
+
+
+# (connect, read) timeout for every MediaWiki API request. WikibaseIntegrator sends
+# them without one, and a write that met a connection the server had already closed
+# then waited forever: a run hung for 8 days on a socket in CLOSE_WAIT, and launchd
+# started no further run while it was alive. A read can legitimately take a while
+# when a large item is saved, hence the generous read part.
+API_TIMEOUT = (15, 300)
+
+
+class _TimeoutAdapter(requests.adapters.HTTPAdapter):
+    """HTTPAdapter that applies API_TIMEOUT to requests that set no timeout."""
+
+    def send(self, request, **kwargs):
+        if kwargs.get('timeout') is None:
+            kwargs['timeout'] = API_TIMEOUT
+        return super().send(request, **kwargs)
+
+
+def apply_api_timeout(session: requests.Session) -> requests.Session:
+    """
+    Give every request on the session a default timeout.
+
+    requests has no session-wide timeout, and WikibaseIntegrator offers no way to
+    pass one to some of its calls (the edit token refresh in particular), so it is
+    set on the transport instead.
+
+    :param session: Session to patch in place.
+    :return: The same session.
+    """
+    adapter = _TimeoutAdapter()
+    session.mount('https://', adapter)
+    session.mount('http://', adapter)
+    return session
 
 
 def get_item_with_retry(wbi, qid: str, description: str = None):
@@ -590,7 +630,7 @@ def get_item_with_retry(wbi, qid: str, description: str = None):
     :param description: Label used in log messages.
     :return: The fetched item.
     """
-    return retry_with_backoff(lambda: wbi.item.get(qid, maxlag=API_MAXLAG),
+    return retry_with_backoff(lambda: wbi.item.get(qid, maxlag=API_READ_MAXLAG),
                               description or f'item.get({qid})')
 
 
@@ -956,12 +996,12 @@ def download_language_dict_csv() -> str:
 
     try:
     # creating HTTP response object from given url
-        resp = requests.get(url)
+        resp = requests.get(url, timeout=API_TIMEOUT)
 
         # saving the xml file
         with open(filename, 'wb') as f:
             f.write(resp.content)
-    except requests.ConnectionError:
+    except (requests.ConnectionError, requests.Timeout):
         filename = "jazyky_default.csv"
 
     return filename

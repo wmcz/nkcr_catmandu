@@ -126,7 +126,8 @@ def test_get_item_with_retry_survives_a_rate_limit(monkeypatch):
 
     assert tools.get_item_with_retry(FakeWbi(), 'Q42') == 'item:Q42'
     assert calls['n'] == 2
-    assert calls['kwargs'].get('maxlag') == tools.API_MAXLAG, 'maxlag must be sent explicitly'
+    assert calls['kwargs'].get('maxlag') == tools.API_READ_MAXLAG, 'maxlag must be sent explicitly'
+    assert tools.API_READ_MAXLAG == 0, 'a read must not wait for the query service lag'
 
 
 def test_get_item_with_retry_gives_up_eventually(monkeypatch):
@@ -141,3 +142,41 @@ def test_get_item_with_retry_gives_up_eventually(monkeypatch):
 
     with pytest.raises(requests.exceptions.HTTPError):
         tools.get_item_with_retry(FakeWbi(), 'Q42')
+
+
+def test_api_timeout_ends_a_request_the_server_never_answers(monkeypatch):
+    """A connection the server accepts but never answers must not block forever."""
+    import socket
+    import threading
+
+    listener = socket.socket()
+    listener.bind(('127.0.0.1', 0))
+    listener.listen(1)
+    port = listener.getsockname()[1]
+    accepted = []
+    threading.Thread(target=lambda: accepted.append(listener.accept()), daemon=True).start()
+
+    monkeypatch.setattr(tools, 'API_TIMEOUT', (1, 1))
+    session = tools.apply_api_timeout(requests.Session())
+    try:
+        with pytest.raises(requests.exceptions.Timeout):
+            session.get(f'http://127.0.0.1:{port}/')
+    finally:
+        listener.close()
+
+
+def test_api_timeout_keeps_an_explicit_timeout(monkeypatch):
+    seen = {}
+
+    def fake_send(self, request, **kwargs):
+        seen['timeout'] = kwargs['timeout']
+        response = requests.Response()
+        response.status_code = 200
+        return response
+
+    monkeypatch.setattr(requests.adapters.HTTPAdapter, 'send', fake_send)
+    session = tools.apply_api_timeout(requests.Session())
+    session.get('https://example.org/', timeout=7)
+    assert seen['timeout'] == 7
+    session.get('https://example.org/')
+    assert seen['timeout'] == tools.API_TIMEOUT

@@ -19,7 +19,7 @@ from sources import Loader
 from tools import *
 
 from wikibaseintegrator.wbi_config import config as wbi_config
-from wikibaseintegrator import WikibaseIntegrator, wbi_login
+from wikibaseintegrator import WikibaseIntegrator, wbi_login, wbi_helpers
 
 log = logging.getLogger(__name__)
 
@@ -54,14 +54,26 @@ oauth2_client_id, oauth2_client_secret = get_oauth2_credentials('oauth2_credenti
 
 wbi_config['USER_AGENT'] = 'Frettiebot/1.0 (https://www.wikidata.org/wiki/User:Frettiebot)'
 wbi_config['SPARQL_ENDPOINT_URL'] = 'https://query-main.wikidata.org/sparql'
-login_instance = wbi_login.OAuth2(consumer_token=oauth2_client_id, consumer_secret=oauth2_client_secret)
+# default_session carries anonymous API calls, helpers_session the SPARQL queries
+# of wbi_helpers.execute_sparql_query (the occupation subclass check)
+apply_api_timeout(wbi_helpers.default_session)
+apply_api_timeout(wbi_helpers.helpers_session)
+
+
+def oauth2_login():
+    login = wbi_login.OAuth2(consumer_token=oauth2_client_id, consumer_secret=oauth2_client_secret)
+    apply_api_timeout(login.get_session())
+    return login
+
+
+login_instance = oauth2_login()
 wbi = WikibaseIntegrator(login=login_instance, is_bot=True)
 
 
 def relogin():
     global wbi, login_instance
     log.info('Logging in to Wikidata again...')
-    login_instance = wbi_login.OAuth2(consumer_token=oauth2_client_id, consumer_secret=oauth2_client_secret)
+    login_instance = oauth2_login()
     wbi = WikibaseIntegrator(login=login_instance, is_bot=True)
     log.info('Logged in again.')
 
@@ -286,12 +298,15 @@ if __name__ == '__main__':
                                 summary="Update NK ČR – " + ', '.join(set(change_text_array)),
                                 is_bot=True,
                                 retry_after=10,
+                                maxlag=API_MAXLAG,
                                 tags=['Czech-Authorities-Sync'])
             except BadItemException as e:
                 log.error(str(e))
             except MissingEntityException as e:
                 log.error(str(e))
-            except requests.exceptions.ConnectionError as e:
+            except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
+                # A read timeout is not a ConnectionError and WikibaseIntegrator does
+                # not retry it; skip the record instead of ending the run.
                 log.error(str(e))
             except requests.exceptions.HTTPError as e:
                 # HTTPError is a sibling of ConnectionError, not a subclass, so it
@@ -319,6 +334,7 @@ if __name__ == '__main__':
                                 is_bot=True,
                                 login=login_instance,
                                 retry_after=10,
+                                maxlag=API_MAXLAG,
                                 tags=['Czech-Authorities-Sync'])
                     except Exception as retry_e:
                         log.error('Re-login nebo zápis po re-loginu selhal: ' + str(retry_e))
@@ -335,6 +351,7 @@ if __name__ == '__main__':
                             is_bot=True,
                             login=login_instance,
                             retry_after=10,
+                            maxlag=API_MAXLAG,
                             tags=['Czech-Authorities-Sync'])
                 except Exception as retry_e:
                     log.error('Re-login nebo zápis po re-loginu selhal: ' + str(retry_e))
