@@ -324,8 +324,9 @@ if __name__ == '__main__':
                 log.error(str(e))
             except MWApiError as e:
                 msg = str(e)
-                if '"bot" right' in msg or 'permissiondenied' in msg.lower() or 'mwoauth-invalid-authorization' in msg:
-                    log.error('MWApiError – chybí bot právo, pokus o relogin a retry: ' + msg)
+                # str(e) is only the info text, the error code is on e.code
+                if '"bot" right' in msg or e.code in ('permissiondenied', 'badtoken', 'mwoauth-invalid-authorization'):
+                    log.error('MWApiError ' + str(e.code) + ', re-login and retry: ' + msg)
                     try:
                         relogin()
                         if processor.item is not None and changed and Config.debug is not True:
