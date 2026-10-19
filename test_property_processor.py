@@ -9,8 +9,7 @@ from property_processor.property_processor_one import PropertyProcessorOne
 from tools import *
 
 wbi_config['USER_AGENT'] = 'Frettiebot/1.0 (https://www.wikidata.org/wiki/User:Frettiebot)'
-oauth2_client_id, oauth2_client_secret = get_oauth2_credentials('oauth2_credentials')
-login_instance = wbi_login.OAuth2(consumer_token=oauth2_client_id, consumer_secret=oauth2_client_secret)
+login_instance = oauth2_login(get_oauth2_access_token('oauth2_credentials'))
 wbi = WikibaseIntegrator(login=login_instance, is_bot=True)
 
 # Create a minimal context for tests

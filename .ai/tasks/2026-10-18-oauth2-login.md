@@ -20,3 +20,11 @@ Větev `123-oauth2-login`. Cíl: místo BotPassword (`wbi_login.Login`) se hlás
 
 ## Poznámka
 Podle tabulky jsou účty s bot flagem z limitů úplně vyjmuté („Bot-flagged accounts … Exempt“) – to se ale projeví jen tehdy, když požadavky dorazí jako přihlášené. OAuth 2 session posílá i cookies, což stránka vyžaduje.
+
+## 2026-10-19: client credentials nefungují pro zápis, přechod na trvalý access token
+- Ostrý běh na plném dumpu (18.–19. 10.): SPARQL fáze ~14 h (s přestávkami kvůli spánku Macu), relogin po vypršení tokenu proběhl správně, ale **všechny zápisy (2) selhaly na `Invalid CSRF token.`**. Běh zastaven na řádku 734 000.
+- Příčina: session z client credentials grantu (`wbi_login.OAuth2`) má CSRF token, který přestane platit během sekund (`action=checktoken`: hned ~50 % valid, po 5 s 0/8). Cookies ani GET/POST na tom nic nemění. Souvisí s T407987 / T420297 (client credentials v MediaWiki teprve dostávají přihlášení jako vlastník).
+- Řešení: owner-only access token (JWT, platí do 3026) posílaný jako `Authorization: Bearer` přes `tools.oauth2_login()` → `wbi_login._Login(session=…)`. `checktoken` 8/8 valid, platný i po 2,5 min a po čteních. Token nevyprší, proto odstraněno `token_expires_soon()`.
+- `oauth2_credentials` má nově 3 řádky (client id, secret, access token), čte se jen poslední; `get_oauth2_access_token()` odmítne soubor, který nekončí JWT.
+- Při `badtoken` (commit d88f042) se bot znovu přihlásí a zápis zopakuje – dřív se `MWApiError` porovnávala přes `str(e)`, což je jen text, ne kód.
+- Skutečný zápis s trvalým tokenem zatím neověřen: testovací běh na 2 úsecích čekal 35 min na maxlag (lag query service ~8,5 s > `maxlag=5`). Ověří se nočním během na Mac mini.

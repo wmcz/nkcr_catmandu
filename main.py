@@ -50,7 +50,7 @@ log.info("Input file: %s" % args.input)
 print_info(config.Config.debug)
 gc.enable()
 
-oauth2_client_id, oauth2_client_secret = get_oauth2_credentials('oauth2_credentials')
+oauth2_access_token = get_oauth2_access_token('oauth2_credentials')
 
 wbi_config['USER_AGENT'] = 'Frettiebot/1.0 (https://www.wikidata.org/wiki/User:Frettiebot)'
 wbi_config['SPARQL_ENDPOINT_URL'] = 'https://query-main.wikidata.org/sparql'
@@ -58,30 +58,17 @@ wbi_config['SPARQL_ENDPOINT_URL'] = 'https://query-main.wikidata.org/sparql'
 # of wbi_helpers.execute_sparql_query (the occupation subclass check)
 apply_api_timeout(wbi_helpers.default_session)
 apply_api_timeout(wbi_helpers.helpers_session)
-
-
-def oauth2_login():
-    login = wbi_login.OAuth2(consumer_token=oauth2_client_id, consumer_secret=oauth2_client_secret)
-    apply_api_timeout(login.get_session())
-    return login
-
-
-login_instance = oauth2_login()
+login_instance = oauth2_login(oauth2_access_token)
 wbi = WikibaseIntegrator(login=login_instance, is_bot=True)
 
 
 def relogin():
     global wbi, login_instance
     log.info('Logging in to Wikidata again...')
-    login_instance = oauth2_login()
+    login_instance = oauth2_login(oauth2_access_token)
     wbi = WikibaseIntegrator(login=login_instance, is_bot=True)
     log.info('Logged in again.')
 
-
-def token_expires_soon(margin=300):
-    # The 4 h token is sent with reads too, an expired one would fail the record being read.
-    expires_at = login_instance.get_session().token.get('expires_at')
-    return expires_at is not None and time.time() > expires_at - margin
 
 if __name__ == '__main__':
     # Start memory tracking
@@ -107,8 +94,6 @@ if __name__ == '__main__':
         chunk.fillna('', inplace=True)
         chunk = chunk[chunk['100a'] != '']
         for row in chunk.to_dict('records'):
-            if token_expires_soon():
-                relogin()
             time_start = time.time()
             nkcr_aut = row['_id']
             save = True

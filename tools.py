@@ -21,6 +21,7 @@ from wikibaseintegrator.entities import ItemEntity
 from wikibaseintegrator.models import References, Snaks, Claim, Snak, Reference
 from wikibaseintegrator.wbi_enums import WikibaseTimePrecision, WikibaseDatatype, ActionIfExists
 from wikibaseintegrator.wbi_exceptions import MissingEntityException, NonExistentEntityError
+from wikibaseintegrator.wbi_login import _Login
 
 import mySparql
 import pywikibot_extension
@@ -1007,22 +1008,38 @@ def download_language_dict_csv() -> str:
     return filename
 
 
-def get_oauth2_credentials(filename):
+def get_oauth2_access_token(filename):
     """
-    Reads the OAuth 2 client id (first line) and client secret (second line)
-    of an owner-only consumer registered at
-    Special:OAuthConsumerRegistration/propose/oauth2.
+    Reads the access token of an owner-only OAuth 2 consumer, shown once when it
+    is registered at Special:OAuthConsumerRegistration/propose/oauth2. It is the
+    last line of the file; lines above it (client id, client secret) are ignored.
 
-    :param filename: The path to the file containing the credentials.
+    :param filename: The path to the file containing the token.
     :type filename: str
-    :return: Tuple (client_id, client_secret).
-    :rtype: tuple[str, str]
+    :return: The access token.
+    :rtype: str
     """
     with open(filename, 'r') as file:
         lines = [line.strip() for line in file if line.strip()]
-    if len(lines) < 2:
-        raise ValueError(filename + ' must contain the client id and the client secret on two lines')
-    return lines[0], lines[1]
+    # an access token is a JWT; a file with only client id and secret would otherwise fail at login
+    if not lines or not lines[-1].startswith('eyJ'):
+        raise ValueError(filename + ' must end with the OAuth 2 access token')
+    return lines[-1]
+
+
+def oauth2_login(access_token: str) -> _Login:
+    """
+    Log in with the owner-only access token sent as a Bearer header.
+
+    Not wbi_login.OAuth2: its client credentials grant gives a session whose CSRF
+    token stops being valid within seconds, so every write failed with badtoken.
+
+    :param access_token: Owner-only OAuth 2 access token.
+    :return: Login usable by WikibaseIntegrator.
+    """
+    session = apply_api_timeout(requests.Session())
+    session.headers['Authorization'] = 'Bearer ' + access_token
+    return _Login(session=session)
 
 
 def first_name(name):
