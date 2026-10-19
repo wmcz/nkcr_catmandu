@@ -28,3 +28,5 @@ Podle tabulky jsou účty s bot flagem z limitů úplně vyjmuté („Bot-flagge
 - `oauth2_credentials` má nově 3 řádky (client id, secret, access token), čte se jen poslední; `get_oauth2_access_token()` odmítne soubor, který nekončí JWT.
 - Při `badtoken` (commit d88f042) se bot znovu přihlásí a zápis zopakuje – dřív se `MWApiError` porovnávala přes `str(e)`, což je jen text, ne kód.
 - Skutečný zápis s trvalým tokenem zatím neověřen: testovací běh na 2 úsecích čekal 35 min na maxlag (lag query service ~8,5 s > `maxlag=5`). Ověří se nočním během na Mac mini.
+- 2026-10-19: `oauth2_credentials` (3 řádky) nahrán na Mac mini, `git pull` na `5d33219` hotový. Výchozí stav pro kontrolu: poslední editace s tagem `Czech-Authorities-Sync` je 2026-10-19T02:32:21Z (Q113846490, ještě BotPassword). Po běhu 20. 10. (launchd 14:08) hledat novější editace s tagem a v logu `Invalid CSRF token` / `MWApiError` / `Traceback`.
+- 2026-10-19: běh na Mac mini ve 14:08 už s `5d33219`, ale spadl po Catmandu – `local_run.sh` hledal `.venv`, Mac mini má `venv` (Python 3.14). Skripty teď berou `.venv`, a když chybí, `venv`. Po pullu spuštěn ručně `main.py` nad hotovým `output.csv`.
