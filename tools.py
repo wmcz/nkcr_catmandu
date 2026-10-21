@@ -150,6 +150,9 @@ def add_new_field_to_item_wbi(
     :return: The modified Wikibase item containing the newly added claim.
     :rtype: ItemEntity
     """
+    if value in Config.qids_never_added:
+        return item_new_field
+
     try:
         claims_by_property = item_new_field.claims.get('P691')
         for claim in claims_by_property:

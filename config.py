@@ -14,6 +14,7 @@ class Config:
     :ivar occupations_not_used_in_occupation_because_is_in_function: A list of
         occupation-related QIDs that are excluded because they are handled in
         another function.
+    :ivar qids_never_added: QIDs the bot never adds as a value of any property.
     :ivar fields_of_work_not_used_in_field_of_work_because_is_not_ok: A list of
         field-of-work QIDs that are excluded as they are not acceptable.
     :ivar instances_not_possible_for_nkcr: A list of instance-related QIDs that
@@ -55,6 +56,10 @@ class Config:
         'Q45722',
         'Q98834032'
 
+    ]
+
+    qids_never_added: list[str] = [
+        'Q1781'
     ]
 
     fields_of_work_not_used_in_field_of_work_because_is_not_ok: list[str] = [
